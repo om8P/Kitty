@@ -69,7 +69,7 @@ One codebase: `src/app` (pages and thin routes), `src/domain` (rules, purchases,
 | Webhook handler | Signature check, dedupe, forward-only state changes | Trust an unverified event, or move a record backward |
 | Tick jobs | Hold refresh, expiry, stale work, replays, reconciliation | Hold a lock across a network call, or release funds with an unknown outcome |
 
-**Payment rail seam.** One interface: `createPoolPayment`, `confirmPoolPayment`, `charge`, `refreshHold`, `releaseHold` and `refund`, each returning `succeeded`, `failed`, `unsupported` or `unknown`. The planned adapter is authorize-and-capture. The fallback adapter uses saved PayPal through Payment Method Tokens and charges each purchase separately. It needs PayPal approval and loses real reserved funds, so it sets `holdsRealFunds` to false and the UI stops saying funds are held. The ledger and rules are identical in both.
+**Payment rail seam.** One interface: `createPoolPayment`, `confirmPoolPayment`, `charge`, `refreshHold`, `releaseHold`, `refund`, `getPoolPaymentState`, `getCapture` and `verifyWebhookSignature`. Calls that change money return `succeeded`, `failed`, `unsupported` or `unknown`. The planned adapter is authorize-and-capture. The fallback adapter uses saved PayPal through Payment Method Tokens and charges each purchase separately. It needs PayPal approval and loses real reserved funds, so it sets `holdsRealFunds` to false and the UI stops saying funds are held. The ledger and rules are identical in both.
 
 **Catalog seam.** `search` and `getProduct`, chosen by `CATALOG_PROVIDER`. Results are stored in `products`, and every caller gets a local ID and local price. Each imported product is mapped to a Kitty store. A product with no mappable store or no USD price is dropped. Channel3's terms forbid caching or storing "a significant portion" of its catalog or output, so Kitty never bulk-imports, stores only the products a search returned and removes unpurchased ones after 24 hours. Kitty shows no retailer or affiliate links. The seam counts searches and switches to the seeded catalog at 900, so the free 1,000 are not exceeded. Channel3's response fields are **[verify]**. The seeded catalog in the public repo is hand-written and no Channel3 data is committed, because its terms are still open.
 
@@ -241,6 +241,7 @@ The tick picks active pools nearing `honor_ends_at`, with a lead time set from t
 | `ledger_entries` | pool, member, purchase, kind (reserve, release, capture, refund, void), amount | Append-only audit trail |
 | `webhook_events` | unique `paypal_event_id`, type, payload, status, attempts, processed at | Dedupe and retry |
 | `agent_runs` | pool, member, task, status, turns, steps (JSON), `heartbeat_at`, error | One open run per agent |
+| `usage_counters` | scope (app or household), kind (Channel3 search, AI request, AI tokens, agent run), period, count | Free-plan limits survive a restart |
 
 Money is integer cents, USD only. Balances are computed in one place in the ledger: `available = authorized - reserved - captured - released` and `member remaining = limit - reserved - captured`.
 
@@ -383,16 +384,15 @@ The refund returns money to the buyer through PayPal, but it is not spendable fr
 
 ## 9. Build order
 
-### Milestone 1: Pool feasibility confirmed (thin spike and prototype)
+### Milestone 1: Pool feasibility confirmed (thin spike)
 
 - **Spike script against the real sandbox.** One approval, authorize $150, at least three partial captures and on to a set count, replay one capture with the same `PayPal-Request-Id`, refund one capture, reauthorize, capture again, void the remainder. Log every response and webhook. This answers Q1 to Q7.
-- **Prototype for Milestone 2 interviews.** One small Next.js page using those same calls: create a pool, approve in PayPal, spend from seeded items, see the balance, close. Member rules and AI results may be hard-coded screens if clearly labeled. Let the person add a member, and log pools created and members added, for the PRD's delegation follow-through metric.
 - **Quick checks.** AG Grid Community on a sample ledger, Drizzle row locks, a test deploy on Northflank Sandbox, a Groq trial of tool calls and strict output, a sample Channel3 response, and a question to Channel3 about terms.
 - **Keep** only the PayPal calls, as the first draft of the adapter. **Stop** if neither partial captures nor the token fallback works.
 
 | Milestone | What it needs | Passes when |
 |---|---|---|
-| 2. Demand validated | No new architecture. Five interviews per group using the prototype | At least 3 of 5 per group would switch, or the direction changes |
+| 2. Product direction | No new architecture. Research, then the owner's decision | The owner confirms the direction and the lead user group |
 | 3. Shared family and agent pools | Schema and constraints, payment adapter, ledger, rules, purchase service, catalog and marketplace, AI reviewer, agent runner, AG Grid ledger with approvals, close and release, webhook intake, demo sessions, replay of `capture_unknown` | 100% of scripted rule-breaking purchases stopped, race test shows 0 pools overspent, replay test shows one charge, labeled test set run including manipulation attempts |
 | 4. Reliable full-term pools | Refunds, hold refresh, tick jobs, term expiry, reconciliation, every failure state in section 8 | A pool stays usable past the honor period, every fault test ends in its documented state, and the ledger matches PayPal |
 | 5. Public demo or hackathon submission | Hosted URL, public repo with an MIT license, README with complete setup steps, judge access, a video under 3 minutes | No hard-coded screens remain and the video shows only flows working in the sandbox. Create a pool more than 3 days before recording so a real refresh can be shown |
@@ -411,7 +411,7 @@ The refund returns money to the buyer through PayPal, but it is not spendable fr
 | Q8 | Do Channel3's terms allow this use, including keeping returned products for 24 hours, and what fields does it return? | Channel3 reply, sample response | Not allowed: set `CATALOG_PROVIDER` to seeded |
 | Q9 | Does AG Grid Community cover the ledger? | Sample ledger | If a feature is Enterprise-only, drop it or build it outside the grid. No paid license is planned |
 | Q10 | Do Northflank Sandbox's limits fit the app, its database and its builds? | Test deploy | Move to the $0 fallback: Render's free web service, Supabase's free Postgres and a GitHub Actions scheduled call. No code change, but the service can sleep and scheduled calls can be delayed |
-| Q11 | Which user group leads after interviews? | Milestone 2 | UI emphasis only. A missed gate stops or redirects the work before Milestone 3 |
+| Q11 | Which user group leads? | Owner's decision after research (S18 in `plan.md`) | UI emphasis only. A change of direction is re-planned before Milestone 3 |
 | Q12 | Is the free model good enough at review and agent work, and do its limits cover the demo? | Labeled test set, Groq trial | Change the prompt, or swap to Gemini 3.8 Flash through the model seam. A paid model would break the $0 budget |
 | Q13 | Would holding and delegating funds need licensing or PayPal approval? | Legal answer | Blocks live payments, which are not designed here |
 

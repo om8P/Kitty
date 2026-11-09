@@ -12,29 +12,28 @@ Full findings and sources are in `docs/research.md`. Survey figures come from se
 - Supported: hard limits appear to earn more trust than AI judgment. In ACI's UK survey, 43% trusted agents to respect spending caps, and 19% trusted them to follow purchasing guidance.
 - Contrary: Forrester found three-quarters of respondents were uncomfortable with autonomous agent payments even with preset limits. Checkout.com found 24% would never delegate purchases to AI.
 - Partly supported: delegating to family can give too much access. 46% of parents caught kids spending on their cards without asking (LendingTree, 2022, dated), but family money apps already address much of this.
-- Assumption — needs validation via user research: budget owners are burdened by approving or paying for small purchases themselves.
+- Assumption — not validated: budget owners are burdened by approving or paying for small purchases themselves.
 - Precedent, not demand evidence for PayPal users: India's UPI Circle and UPI Reserve Pay offer delegated and reserved payments. Specific UPI claims must be verified before use in the pitch.
 - Existing alternatives: card network agent programs, agent virtual cards and family money apps offer limits or merchant controls. A brief search found none combining funds reserved up front, one pool shared by people and agents, and the PayPal wallet.
 
 ## Users
-- **Primary (equal priority until demand validation chooses the lead)**:
+- **Primary (equal priority until the owner chooses the lead after research)**:
   - Household budget owners who pay for shared purchases and want family members to spend within limits.
   - People who want an AI shopping agent to buy on their behalf within firm limits.
 - **Shared story**: A parent delegates a grocery budget to an AI agent and a teen.
-- **Later tier**: Organizations that delegate spending to employees, departments or agents. Roadmap only; needs are TBD — needs validation via user research.
+- **Later tier**: Organizations that delegate spending to employees, departments or agents. Roadmap only; needs are TBD — needs validation via research.
 - **Not for (MVP)**: Organizations, and anyone who needs to spend at merchants outside Kitty's demo marketplace.
 
 ## Hypothesis
 We believe **one-approval PayPal pools with hard per-member limits and AI purchase checks** will **make people willing to delegate spending** for **household budget owners and AI agent users**.
-We'll know we're right when **100% of test purchases that break a hard rule are stopped, no pool is overspent, and at least 3 of 5 people interviewed in each user group say they would use it in place of how they delegate spending today**.
+We'll know we're right when **100% of test purchases that break a hard rule are stopped and no pool is overspent**. Whether people will actually delegate spending is not tested before launch.
 
 ## Success Metrics
 | Metric | Target | How measured |
 |---|---|---|
 | Hard-rule enforcement | 100% of rule-breaking test purchases stopped | Scripted purchase scenarios against the PayPal sandbox |
 | Pool integrity | 0 pools overspent | Compare each pool's approved amount with its total captured spend in the sandbox |
-| Demand (stage gate) | At least 3 of 5 interviewees per user group would switch to it | Structured interviews with target users after showing the prototype |
-| Delegation follow-through | TBD — needs validation via prototype testing | Share of prototype users who create a pool and delegate spending |
+| Delegation follow-through | TBD — set from public demo usage | Share of demo households that create a pool and delegate spending |
 | AI purchase review quality | TBD — set after building a labeled test set | Compare AI decisions with expected outcomes |
 
 ## Scope
@@ -45,7 +44,7 @@ We'll know we're right when **100% of test purchases that break a hard rule are 
 - AG Grid — powers the owner's live ledger of every purchase, showing the member, amount, rule result, AI decision and status, with approvals handled from the ledger.
 
 **Out of scope**
-- Organization tier — roadmap only until family and AI agent demand is validated.
+- Organization tier — roadmap only for now.
 - Spending at merchants outside the demo marketplace — one PayPal authorization appears to be tied to one payee. See Open Questions.
 - Payouts to separate sellers — requires a PayPal platform setup.
 - Live payments — sandbox only until the legal and compliance question is answered.
@@ -59,12 +58,12 @@ Milestones are ordered by what must be proven first. Each must pass before the n
 
 | # | Milestone | Outcome | Status | Plan |
 |---|---|---|---|---|
-| 1 | Pool feasibility confirmed | A budget can be reserved once, spent in pieces and have its remainder released in the real sandbox, and a prototype can show this to users | pending | — |
-| 2 | Demand validated | Five people from each user group have been interviewed; at least 3 of 5 per group would switch, or the direction changes; the lead user group is chosen | pending | — |
+| 1 | Pool feasibility confirmed | A budget can be reserved once, spent in pieces and have its remainder released in the real sandbox | pending | — |
+| 2 | Product direction chosen | Competitor research is finished, and the owner has confirmed the direction and the lead user group | pending | — |
 | 3 | Shared family and agent pools | An owner can fund one pool and let family members and AI agents spend under individual rules, with off-goal or over-limit purchases stopped | pending | — |
 | 4 | Reliable full-term pools | Pools stay usable for their full term, with refunds, renewed reservations and clear handling of failed spending | pending | — |
 | 5 | Public demo or hackathon submission | A deployed product and demo video show the complete flow working as described | pending | — |
-| 6 | Organization tier | Organizations can delegate spending; scope depends on validation | pending | — |
+| 6 | Organization tier | Organizations can delegate spending; scope depends on research | pending | — |
 
 ## Open Questions
 - [ ] Does the sandbox account support multiple partial captures, and is PayPal approval needed?
@@ -85,8 +84,8 @@ Milestones are ordered by what must be proven first. Each must pass before the n
 |---|---|---|---|
 | Partial captures are unavailable in the sandbox | TBD — needs validation via sandbox test | High | Test first; fall back to separately charging saved PayPal accounts, accepting the loss of reserved funds |
 | Reserved funds cannot be guaranteed for the full pool period | Medium | High | Set clear pool durations, renew reservations and show failed-spend states |
-| The problem is not urgent enough for one or both user groups | Medium | High | Interview five people per group before the full build, and stop or change direction if the gate is missed |
-| People stay uneasy about agents paying even with limits | Medium | High | Lead with hard limits and approvals; test comfort in interviews |
+| The problem is not urgent enough for one or both user groups | Medium | High | Accepted without interviews. Rely on published surveys, and have the owner confirm the direction after competitor research |
+| People stay uneasy about agents paying even with limits | Medium | High | Lead with hard limits and approvals |
 | PayPal's own agent controls overlap with Kitty | TBD — needs validation via PayPal documentation | High | Check PayPal's current product before finalizing positioning; present Kitty as a household layer on PayPal, not a rival |
 | Existing limit and merchant-control products are good enough | Medium | Medium | Finish competitor research; focus on reserved funds and one pool shared by people and agents |
 | The one-merchant limit reduces real-world usefulness | High | Medium | Be explicit about the limit; investigate multi-merchant options |
