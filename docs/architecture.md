@@ -395,7 +395,7 @@ The refund returns money to the buyer through PayPal, but it is not spendable fr
 | 2. Product direction | No new architecture. Research, then the owner's decision | The owner confirms the direction and the lead user group |
 | 3. Shared family and agent pools | Schema and constraints, payment adapter, ledger, rules, purchase service, catalog and marketplace, AI reviewer, agent runner, AG Grid ledger with approvals, close and release, webhook intake, demo sessions, replay of `capture_unknown` | 100% of scripted rule-breaking purchases stopped, race test shows 0 pools overspent, replay test shows one charge, labeled test set run including manipulation attempts |
 | 4. Reliable full-term pools | Refunds, hold refresh, tick jobs, term expiry, reconciliation, every failure state in section 8 | A pool stays usable past the honor period, every fault test ends in its documented state, and the ledger matches PayPal |
-| 5. Public demo or hackathon submission | Hosted URL, public repo with an MIT license, README with complete setup steps, judge access, a video under 3 minutes | No hard-coded screens remain and the video shows only flows working in the sandbox. Create a pool more than 3 days before recording so a real refresh can be shown |
+| 5. Public demo or hackathon submission | Hosted URL, public repo with an MIT license, README with complete setup steps, judge access, a video under 3 minutes | No hard-coded screens remain and the video shows only flows working in the sandbox. The hackathon video does not show a hold refresh, because the deadline leaves no time for a pool to pass its 3-day honor period |
 
 ## 10. Decisions that remain open
 
