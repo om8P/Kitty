@@ -1,0 +1,13 @@
+.git
+.github
+.claude
+node_modules
+.next
+coverage
+.spike-logs
+.env*
+!.env.example
+docs
+*.md
+Dockerfile
+.dockerignore
