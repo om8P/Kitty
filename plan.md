@@ -67,7 +67,7 @@ Database tests need `docker compose up -d db` first.
 | S11a | Record Channel3's answer | You | S11 | pending |
 | S12 | Test deploy on Northflank | Agent + You | S02, S03 | pending |
 | **Phase B: Product direction (PRD milestone 2)** | | | | |
-| S15 | Finish competitor and PayPal research | Agent | S01 | pending |
+| S15 | Finish competitor and PayPal research | Agent | S01 | done |
 | S15a | Record the hackathon rules | Agent | S01 | pending |
 | S18 | **Gate:** product direction decision | Agent + You | S15, S15a | pending |
 | **Phase C: Shared pools (PRD milestone 3)** | | | | |
