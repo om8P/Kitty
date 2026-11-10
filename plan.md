@@ -55,7 +55,7 @@ Database tests need `docker compose up -d db` first.
 | S02 | Create free accounts and keys | You | S01, S03 | done |
 | S03 | Scaffold the app | Agent | S01 | done |
 | S04 | PayPal sandbox client | Agent | S03 | done |
-| S05 | Spike: authorize and partial captures | Agent + You | S02, S04 | pending |
+| S05 | Spike: authorize and partial captures | Agent + You | S02, S04 | done |
 | S06a | Spike: refund and void | Agent + You | S05 | pending |
 | S06b | Spike: reauthorize | Agent + You | S05 | pending |
 | S07 | Spike: webhooks and read calls | Agent + You | S06a | pending |
