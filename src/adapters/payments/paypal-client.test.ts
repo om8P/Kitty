@@ -258,6 +258,12 @@ describe("PayPal client", () => {
       expect(result).toMatchObject({ outcome: "unsupported", code: "AUTH_CAPTURE_NOT_ENABLED", httpStatus: 422 });
     });
 
+    it("treats a reauthorization inside the honor period as unsupported (seen in S06b)", async () => {
+      const { client } = setup([paypalError(422, "UNPROCESSABLE_ENTITY", ["REAUTHORIZATION_TOO_SOON"])]);
+      const result = await client.reauthorizeAuthorization({ authorizationId: "AUTH-1", requestId: "r1", amount: usd("51.00") });
+      expect(result).toMatchObject({ outcome: "unsupported", code: "REAUTHORIZATION_TOO_SOON", httpStatus: 422 });
+    });
+
     it("is failed when every issue is a definite failure", async () => {
       const { client } = setup([paypalError(422, "UNPROCESSABLE_ENTITY", ["INSTRUMENT_DECLINED"])]);
       const result = await client.captureAuthorization({ authorizationId: "AUTH-1", requestId: "r1", amount: usd("1.00") });

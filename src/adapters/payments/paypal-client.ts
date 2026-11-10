@@ -25,6 +25,8 @@ export const UNSUPPORTED_ISSUES: ReadonlySet<string> = new Set([
   "UNSUPPORTED_INTENT_FOR_PAYMENT_SOURCE",
   "ACTION_DOES_NOT_MATCH_INTENT",
   "PAYMENT_TYPE_NOT_SUPPORTED_FOR_INTENT",
+  // Observed in S06b: reauthorizing inside the 3-day honor period. Nothing changes.
+  "REAUTHORIZATION_TOO_SOON",
 ]);
 
 /**
