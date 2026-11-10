@@ -5,7 +5,7 @@ Each step is sized for one chat. A fresh session can run any step using this fil
 - **Requirements:** `.claude/prds/kitty.prd.md`
 - **Design:** `docs/architecture.md` (referred to below as "arch")
 - **Decisions:** `docs/adr.md`
-- **Budget:** $0. **Deadline:** none set.
+- **Budget:** $0. **Deadline:** Nov 12, 2026, 12:00 pm Pacific (hackathon submission, `docs/hackathon-rules.md`).
 
 ## How to run a step
 
@@ -68,7 +68,7 @@ Database tests need `docker compose up -d db` first.
 | S12 | Test deploy on Northflank | Agent + You | S02, S03 | pending |
 | **Phase B: Product direction (PRD milestone 2)** | | | | |
 | S15 | Finish competitor and PayPal research | Agent | S01 | done |
-| S15a | Record the hackathon rules | Agent | S01 | pending |
+| S15a | Record the hackathon rules | Agent | S01 | done |
 | S18 | **Gate:** product direction decision | Agent + You | S15, S15a | pending |
 | **Phase C: Shared pools (PRD milestone 3)** | | | | |
 | S19 | Database schema and constraints | Agent | S08a, S09, S18 | pending |
@@ -108,7 +108,7 @@ Database tests need `docker compose up -d db` first.
 | S47b | **Gate, part 2:** finish the full-term pool | Agent + You | S47a | pending |
 | **Phase E: Public demo (PRD milestone 5)** | | | | |
 | S49 | Judge access | Agent + You | S48 | pending |
-| S50 | Polish the core screens | Agent | S47b | pending |
+| S50 | Polish the core screens | Agent | S47a | pending |
 | S51 | Security review | Agent | S49, S50 | pending |
 | S52 | README and open-source license check | Agent | S15a, S49 | pending |
 | S53 | Clean-account end-to-end run | Agent + You | S51, S52 | pending |
@@ -610,11 +610,11 @@ Database tests need `docker compose up -d db` first.
 **Context:** Arch 9 milestone 4. Runs on the hosted app. **Your part:** approve the pool.
 **Do:** Create a pool, spend from it, and note its start date in `docs/test-results.md`.
 **Check:** the first purchases appear in the ledger and PayPal.
-**Done when:** the pool is active. S47b can run once 3 days have passed.
+**Done when:** the pool is active. S47b can run once 3 days have passed, and nothing before the submission waits for it.
 
 ### S47b: Gate, part 2: finish the full-term pool (Agent + You)
 
-**Context:** Arch 9 milestone 4. Run this after the honor period has passed. **Your part:** confirm the results in the sandbox dashboard.
+**Context:** Arch 9 milestone 4. Run this after the honor period has passed, which falls after the hackathon submission. **Your part:** confirm the results in the sandbox dashboard.
 **Do:** Spend again, refresh the hold, refund a purchase, close the pool and record the results and pool-integrity comparison in `docs/test-results.md`.
 **Check:** the pool is usable after the honor period and the ledger matches PayPal.
 **Done when:** the gate passes. A failure sets this to `blocked`, and a fix step is inserted.
@@ -660,9 +660,9 @@ Database tests need `docker compose up -d db` first.
 
 ### S53a: Start the demo pool (You)
 
-**Context:** A real hold refresh can only be shown more than 3 days after a pool starts.
+**Context:** The video uses this pool. A real hold refresh needs a pool more than 3 days old, so the video must not show or imply one.
 **Do:** Create and approve the pool for the video.
-**Done when:** the pool is active and at least 3 days have passed.
+**Done when:** the pool is active.
 
 ### S54: Demo video (You)
 
@@ -748,3 +748,5 @@ Every change gets one line in the Change log.
 | 2026-11-10 | Removed S13, S14, S16, S17 and S46d, and made S18 the owner's decision | The owner removed the interviews, and the prototype existed only for them |
 | 2026-11-10 | S01 also commits the PRD and architecture edits | Both had uncommitted edits that this plan depends on |
 | 2026-11-10 | S03 sets Node 22.13 as the minimum and adds the design tokens and fonts | Vitest 5 needs Node 22.12 or newer and ESLint 10 needs 22.13 or newer, and no later step owned the tokens |
+| 2026-11-10 | Set the deadline to Nov 12, 2026, 12:00 pm Pacific | S15a read it in the Official Rules, and the owner decided to enter and follow this plan |
+| 2026-11-10 | Removed the 3-day waits from the path to S55: S50 now depends on S47a, S53a no longer waits, and S47b runs after the submission | A 3-day wait ends after the deadline. The owner approved, and the rules don't require a hold refresh |
