@@ -1,0 +1,20 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      # Throwaway credentials for this local container only. Never reuse them.
+      POSTGRES_USER: kitty
+      POSTGRES_PASSWORD: kitty
+      POSTGRES_DB: kitty
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - kitty-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kitty -d kitty"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  kitty-db:

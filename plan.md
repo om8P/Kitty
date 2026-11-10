@@ -53,7 +53,7 @@ Database tests need `docker compose up -d db` first.
 | **Phase A: Feasibility (PRD milestone 1)** | | | | |
 | S01 | Put planning docs on main | Agent | none | done |
 | S02 | Create free accounts and keys | You | S01, S03 | pending |
-| S03 | Scaffold the app | Agent | S01 | pending |
+| S03 | Scaffold the app | Agent | S01 | done |
 | S04 | PayPal sandbox client | Agent | S03 | pending |
 | S05 | Spike: authorize and partial captures | Agent + You | S02, S04 | pending |
 | S06a | Spike: refund and void | Agent + You | S05 | pending |
@@ -150,7 +150,7 @@ Database tests need `docker compose up -d db` first.
 
 ### S03: Scaffold the app
 
-**Context:** Arch 2 and 3. Node 22 and Docker are available locally. The repo is public and has no license. `create-next-app` refuses a folder that already has files such as `rules.md`.
+**Context:** Arch 2 and 3. Node 22.13 or newer and Docker are available locally. The repo is public and has no license. `create-next-app` refuses a folder that already has files such as `rules.md`.
 **Do:**
 - Scaffold Next.js App Router with TypeScript in a temporary folder, then copy it to the repo root without overwriting existing files. Use the `src/` layout from arch 3.
 - Add Zod, Vitest, `tsx`, one smoke test, a `/api/health` route, and `lint`, `typecheck` and `test` scripts.
@@ -747,3 +747,4 @@ Every change gets one line in the Change log.
 | 2026-11-10 | Plan created and revised after adversarial review | From the PRD and architecture |
 | 2026-11-10 | Removed S13, S14, S16, S17 and S46d, and made S18 the owner's decision | The owner removed the interviews, and the prototype existed only for them |
 | 2026-11-10 | S01 also commits the PRD and architecture edits | Both had uncommitted edits that this plan depends on |
+| 2026-11-10 | S03 sets Node 22.13 as the minimum and adds the design tokens and fonts | Vitest 5 needs Node 22.12 or newer and ESLint 10 needs 22.13 or newer, and no later step owned the tokens |

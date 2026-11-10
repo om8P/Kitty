@@ -1,0 +1,27 @@
+:root {
+  --text: #000000;
+  --text-muted: #686a6d;
+  --surface: #ffffff;
+  --surface-warm: #f1efea;
+  --navy: #002991;
+  --blue: #0066f5;
+  --sky: #60cdff;
+  --tint: rgba(5, 55, 130, 0.08);
+  --line: rgba(0, 0, 0, 0.1);
+}
+
+body {
+  margin: 0;
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-body), sans-serif;
+  font-size: 16px;
+  font-weight: 400;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-heading), sans-serif;
+  font-weight: 800;
+}
