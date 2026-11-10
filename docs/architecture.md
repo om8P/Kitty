@@ -43,7 +43,7 @@ Read from each provider's site in November 2026. Free plans change, so recheck t
 | Service | What is free | When the limit is reached | Still to confirm |
 |---|---|---|---|
 | Northflank Sandbox | 2 services, 2 jobs, 1 database, up to $20 a month of resources, no card, "always on, no sleeping" | Not stated. With no card on file there is nothing to charge | CPU, memory, database size and build limits, which the pricing page doesn't give |
-| Groq, `openai/gpt-oss-120b` | 30 requests a minute, 1,000 a day, 8,000 tokens a minute, 200,000 tokens a day | Reviews go to owner approval and agent runs stop | That this table is the free plan, and that no card is needed, which comes from third-party lists |
+| Groq, `openai/gpt-oss-120b` | 30 requests a minute, 1,000 a day, 8,000 tokens a minute, 200,000 tokens a day | Reviews go to owner approval and agent runs stop | That this table is the free plan, which comes from third-party lists. No card was needed at sign-up (owner, 2026-11-10) |
 | Channel3 | 1,000 searches with no card, then about $7 per 1,000 | Kitty stops at 900 and switches to the seeded catalog | Whether the 1,000 is one-time or monthly. The price appears only on its blog |
 | PayPal sandbox, AG Grid Community, public GitHub repo | Free | No known limit that affects Kitty | None. AG Grid features were confirmed in S09 (Q9) |
 

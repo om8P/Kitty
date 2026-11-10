@@ -52,7 +52,7 @@ Database tests need `docker compose up -d db` first.
 |---|---|---|---|---|
 | **Phase A: Feasibility (PRD milestone 1)** | | | | |
 | S01 | Put planning docs on main | Agent | none | done |
-| S02 | Create free accounts and keys | You | S01, S03 | pending |
+| S02 | Create free accounts and keys | You | S01, S03 | done |
 | S03 | Scaffold the app | Agent | S01 | done |
 | S04 | PayPal sandbox client | Agent | S03 | pending |
 | S05 | Spike: authorize and partial captures | Agent + You | S02, S04 | pending |
