@@ -65,7 +65,7 @@ Database tests need `docker compose up -d db` first.
 | S10 | Trial Groq tool calls and strict output | Agent + You | S02, S03 | pending |
 | S11 | Sample Channel3 and ask about its terms | Agent + You | S02, S03 | pending |
 | S11a | Record Channel3's answer | You | S11 | pending |
-| S12 | Test deploy on Northflank | Agent + You | S02, S03 | pending |
+| S12 | Test deploy on Northflank | Agent + You | S02, S03 | in-progress |
 | **Phase B: Product direction (PRD milestone 2)** | | | | |
 | S15 | Finish competitor and PayPal research | Agent | S01 | done |
 | S15a | Record the hackathon rules | Agent | S01 | done |
