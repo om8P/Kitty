@@ -63,7 +63,7 @@ Database tests need `docker compose up -d db` first.
 | S08a | Spike the token fallback (only if S08 chose it) | Agent + You | S08 | pending |
 | S09 | Check AG Grid and Drizzle row locks | Agent | S03 | done |
 | S10 | Trial Groq tool calls and strict output | Agent + You | S02, S03 | pending |
-| S11 | Sample Channel3 and ask about its terms | Agent + You | S02, S03 | pending |
+| S11 | Sample Channel3 and ask about its terms | Agent + You | S02, S03 | done |
 | S11a | Record Channel3's answer | You | S11 | pending |
 | S12 | Test deploy on Northflank | Agent + You | S02, S03 | pending |
 | **Phase B: Product direction (PRD milestone 2)** | | | | |
@@ -411,7 +411,7 @@ Database tests need `docker compose up -d db` first.
 **Context:** Arch 3 (catalog seam), ADR-0007. Channel3 is an MVP sponsor tool. If S11a rules it out, ask the owner, who approves any PRD edit, then set this step to `skipped`.
 **Do:**
 - Implement search behind the seam, mapping to Kitty stores, with fallback to seeded on errors.
-- Store only returned products. Count searches in `usage_counters`, starting from S11's count, and switch to seeded at 900.
+- Store only returned products. Count searches per month in `usage_counters`, starting from S11's count, and switch to seeded at 900 a month. Use the fields and offer rule in `docs/spike/S11.md`.
 - Provide the purge function for unpurchased products older than 24 hours (S41b schedules it).
 
 **Check:** tests with hand-written synthetic fixtures matching S11's field shape. Never commit recorded responses. Test the switch at 900.
@@ -750,3 +750,4 @@ Every change gets one line in the Change log.
 | 2026-11-10 | S03 sets Node 22.13 as the minimum and adds the design tokens and fonts | Vitest 5 needs Node 22.12 or newer and ESLint 10 needs 22.13 or newer, and no later step owned the tokens |
 | 2026-11-10 | Set the deadline to Nov 12, 2026, 12:00 pm Pacific | S15a read it in the Official Rules, and the owner decided to enter and follow this plan |
 | 2026-11-10 | Removed the 3-day waits from the path to S55: S50 now depends on S47a, S53a no longer waits, and S47b runs after the submission | A 3-day wait ends after the deadline. The owner approved, and the rules don't require a hold refresh |
+| 2026-11-10 | S27 counts Channel3 searches per month | S11 found the 1,000 free credits renew monthly |
