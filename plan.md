@@ -1,6 +1,6 @@
 # Kitty Build Plan
 
-Each step is sized for one chat. A fresh session can run any step using this file, `CLAUDE.md` and the documents the step names.
+Each step is sized for one chat. A fresh session can run any step using this file, `rules.md` and the documents the step names.
 
 - **Requirements:** `.claude/prds/kitty.prd.md`
 - **Design:** `docs/architecture.md` (referred to below as "arch")
@@ -131,9 +131,9 @@ Database tests need `docker compose up -d db` first.
 
 ### S01: Put planning docs on main
 
-**Context:** The PRD, research and architecture are on branch `docs/kitty-prd-architecture`. `docs/adr.md`, `plan.md` and `CLAUDE.md` are not committed, and the PRD and architecture have uncommitted edits. Fresh sessions branch from `main`, so they need these files there. Runs on the existing docs branch.
+**Context:** The PRD, research and architecture are on branch `docs/kitty-prd-architecture`. `docs/adr.md`, `plan.md` and `rules.md` are not committed, and the PRD and architecture have uncommitted edits. Fresh sessions branch from `main`, so they need these files there. Runs on the existing docs branch.
 **Do:** With the owner's approval, commit the three new files and the PRD and architecture edits, push, and merge the branch into `main`.
-**Check:** `git fetch && git ls-tree -r origin/main --name-only` lists `CLAUDE.md`, `plan.md`, `.claude/prds/kitty.prd.md` and all three of `docs/architecture.md`, `docs/adr.md`, `docs/research.md`.
+**Check:** `git fetch && git ls-tree -r origin/main --name-only` lists `rules.md`, `plan.md`, `.claude/prds/kitty.prd.md` and all three of `docs/architecture.md`, `docs/adr.md`, `docs/research.md`.
 **Done when:** every planning document is on `origin/main`.
 
 ### S02: Create free accounts and keys (You)
@@ -150,7 +150,7 @@ Database tests need `docker compose up -d db` first.
 
 ### S03: Scaffold the app
 
-**Context:** Arch 2 and 3. Node 22 and Docker are available locally. The repo is public and has no license. `create-next-app` refuses a folder that already has files such as `CLAUDE.md`.
+**Context:** Arch 2 and 3. Node 22 and Docker are available locally. The repo is public and has no license. `create-next-app` refuses a folder that already has files such as `rules.md`.
 **Do:**
 - Scaffold Next.js App Router with TypeScript in a temporary folder, then copy it to the repo root without overwriting existing files. Use the `src/` layout from arch 3.
 - Add Zod, Vitest, `tsx`, one smoke test, a `/api/health` route, and `lint`, `typecheck` and `test` scripts.
