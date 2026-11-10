@@ -21,7 +21,7 @@ Kitty is one Next.js app on an always-on Node host, with one Postgres database a
 | App | Next.js App Router and TypeScript, run with `next start` | UI, API, webhooks and agent runner ship as one deployable | Separate backend service: a second deployable with no benefit at this size |
 | Host | Northflank Sandbox (free): one always-on service, its one Postgres add-on, one cron job | Free with no card and "always on, no sleeping", so webhooks, scheduling and long agent runs all work in one place **[verify]** | Render free: the web service sleeps, cron costs at least $1 a month, and free Postgres is deleted after about 44 days. Vercel Hobby: non-commercial only, and its terms list processing visitor payments as commercial use |
 | Database | PostgreSQL on Northflank's free add-on | Row locks, check constraints and unique indexes carry the money rules | SQLite: weak fit for concurrent writes on a hosted service |
-| Data access | Drizzle ORM with `pg`, Zod at every boundary | SQL-first migrations and row locks without raw SQL **[verify]** | Prisma: row locks need raw SQL **[verify]** |
+| Data access | Drizzle ORM with `pg`, Zod at every boundary | SQL-first migrations, and row locks without raw SQL (confirmed in `docs/spike/S09.md`) | Prisma: row locks need raw SQL **[verify]** |
 | PayPal | Small typed `fetch` wrapper in the adapter, redirect to PayPal's approval link | Full control of `PayPal-Request-Id`, timeouts and retries, with no PayPal code in the browser | A PayPal SDK or MCP server: hides the retry behavior Kitty must own |
 | AI model | Groq free plan, `openai/gpt-oss-120b` for both agent and review, through the `groq-sdk` package, behind a model seam | Free, with published limits, tool use and strict JSON-schema output, and only one model to test | Claude API: no free tier, only a small one-time credit. Gemini 3.8 Flash: free, but its limits aren't published and free-tier content is used to improve Google's products |
 | Purchase review | One Groq call with strict JSON-schema output and no tools | Output limited to `allow`, `flag` or `block` plus a reason | Parsing free text: a malformed answer could be misread |
@@ -29,7 +29,7 @@ Kitty is one Next.js app on an always-on Node host, with one Postgres database a
 | Agent execution | Background task in the always-on Node process; the request returns a run ID at once | A run can take minutes and does not fit in a request | Separate worker service: not justified yet |
 | Scheduled work | Northflank cron job (the free plan includes two jobs) posts to an authenticated `/api/internal/tick` every 5 minutes | No timers in the app, and easy to trigger by hand | Redis and a job queue: more infrastructure for one job |
 | Product data | Channel3 `/v1/search` behind a catalog seam, keeping only the few products each search returns | Real products with 1,000 free searches, replaceable by a seeded catalog | Channel3 MCP for the agent: the agent may have only Kitty's two tools |
-| Owner ledger | AG Grid Community | Live table with sorting, filtering and Approve and Deny cells **[verify]** | AG Grid Enterprise: no required ledger feature is known to need it |
+| Owner ledger | AG Grid Community | Live table with sorting, filtering and Approve and Deny cells (confirmed in `docs/spike/S09.md`) | AG Grid Enterprise: no required ledger feature is known to need it |
 | Live updates | Poll the ledger API every 2-3 seconds | Simple and fast enough for a household | WebSockets: more to run for no visible gain |
 | Access | Signed httpOnly cookie, demo personas, shared access code | Proportionate to a sandbox product | A hosted identity provider |
 | Tests | Vitest on real Postgres, plus scripted sandbox scenarios | Race tests mean nothing against a mock | Mocking the database |
@@ -45,7 +45,7 @@ Read from each provider's site in November 2026. Free plans change, so recheck t
 | Northflank Sandbox | 2 services, 2 jobs, 1 database, up to $20 a month of resources, no card, "always on, no sleeping" | Not stated. With no card on file there is nothing to charge | CPU, memory, database size and build limits, which the pricing page doesn't give |
 | Groq, `openai/gpt-oss-120b` | 30 requests a minute, 1,000 a day, 8,000 tokens a minute, 200,000 tokens a day | Reviews go to owner approval and agent runs stop | That this table is the free plan, and that no card is needed, which comes from third-party lists |
 | Channel3 | 1,000 searches with no card, then about $7 per 1,000 | Kitty stops at 900 and switches to the seeded catalog | Whether the 1,000 is one-time or monthly. The price appears only on its blog |
-| PayPal sandbox, AG Grid Community, public GitHub repo | Free | No known limit that affects Kitty | AG Grid features (Q9) |
+| PayPal sandbox, AG Grid Community, public GitHub repo | Free | No known limit that affects Kitty | None. AG Grid features were confirmed in S09 (Q9) |
 
 **Spending rules.** Never add a card or upgrade a plan on any service. Reaching a free limit can stop a feature, and each one has a defined safe result.
 
@@ -409,7 +409,7 @@ The refund returns money to the buyer through PayPal, but it is not spendable fr
 | Q6 | Does a refund restore authorization capacity? | Spike | Yes: change the ledger formulas and check constraint, then decide whether member limits are also restored |
 | Q7 | Do webhooks and read APIs identify each capture and carry `invoice_id`, and which failure event arrives, `DECLINED` or `DENIED`? | Spike | Not identifiable: match on authorization, amount and time, or settle by hand sooner. Both failure events are handled regardless |
 | Q8 | Do Channel3's terms allow this use, including keeping returned products for 24 hours, and what fields does it return? | Channel3 reply, sample response | Not allowed: set `CATALOG_PROVIDER` to seeded |
-| Q9 | Does AG Grid Community cover the ledger? | Sample ledger | If a feature is Enterprise-only, drop it or build it outside the grid. No paid license is planned |
+| Q9 | Does AG Grid Community cover the ledger? | Sample ledger. **Answered yes in `docs/spike/S09.md`.** No required feature is Enterprise-only | If a feature is Enterprise-only, drop it or build it outside the grid. No paid license is planned |
 | Q10 | Do Northflank Sandbox's limits fit the app, its database and its builds? | Test deploy | Move to the $0 fallback: Render's free web service, Supabase's free Postgres and a GitHub Actions scheduled call. No code change, but the service can sleep and scheduled calls can be delayed |
 | Q11 | Which user group leads? | Owner's decision after research (S18 in `plan.md`) | UI emphasis only. A change of direction is re-planned before Milestone 3 |
 | Q12 | Is the free model good enough at review and agent work, and do its limits cover the demo? | Labeled test set, Groq trial | Change the prompt, or swap to Gemini 3.8 Flash through the model seam. A paid model would break the $0 budget |

@@ -61,7 +61,7 @@ Database tests need `docker compose up -d db` first.
 | S07 | Spike: webhooks and read calls | Agent + You | S06a | pending |
 | S08 | **Gate:** feasibility decision | Agent + You | S06a, S06b, S07 | pending |
 | S08a | Spike the token fallback (only if S08 chose it) | Agent + You | S08 | pending |
-| S09 | Check AG Grid and Drizzle row locks | Agent | S03 | pending |
+| S09 | Check AG Grid and Drizzle row locks | Agent | S03 | done |
 | S10 | Trial Groq tool calls and strict output | Agent + You | S02, S03 | pending |
 | S11 | Sample Channel3 and ask about its terms | Agent + You | S02, S03 | pending |
 | S11a | Record Channel3's answer | You | S11 | pending |
