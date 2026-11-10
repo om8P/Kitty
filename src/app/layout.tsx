@@ -1,16 +1,20 @@
 import type { Metadata } from "next";
-import { Inter, Plus_Jakarta_Sans } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 
-const heading = Plus_Jakarta_Sans({
-  subsets: ["latin"],
-  weight: "800",
+// Both fonts are SIL OFL 1.1; their licenses sit beside them in assets/fonts/.
+const heading = localFont({
+  src: "../../assets/fonts/PlusJakartaSans-Variable-Latin.woff2",
+  weight: "200 800",
   variable: "--font-heading",
+  display: "swap",
 });
 
-const body = Inter({
-  subsets: ["latin"],
+const body = localFont({
+  src: "../../assets/fonts/Inter-Variable-Latin.woff2",
+  weight: "100 900",
   variable: "--font-body",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
