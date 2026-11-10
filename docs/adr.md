@@ -287,4 +287,4 @@ Channel3 `/v1/search` sits behind a catalog seam. Kitty stores only the products
 - Unpurchased products must be fetched again after 24 hours.
 
 #### Risks
-- The terms may not allow this use at all, and the 1,000 searches may be one-time. Question Q8 covers this, and `CATALOG_PROVIDER` can switch to the seeded catalog.
+- The terms may not allow this use at all. Question Q8 covers this, and `CATALOG_PROVIDER` can switch to the seeded catalog. S11 found that the 1,000 free credits renew monthly, and that Channel3's caching guide suggests a shorter retention than 24 hours (`docs/spike/S11.md`).
