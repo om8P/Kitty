@@ -57,7 +57,7 @@ Database tests need `docker compose up -d db` first.
 | S04 | PayPal sandbox client | Agent | S03 | done |
 | S05 | Spike: authorize and partial captures | Agent + You | S02, S04 | done |
 | S06a | Spike: refund and void | Agent + You | S05 | pending |
-| S06b | Spike: reauthorize | Agent + You | S05 | pending |
+| S06b | Spike: reauthorize | Agent + You | S05 | blocked |
 | S07 | Spike: webhooks and read calls | Agent + You | S06a | pending |
 | S08 | **Gate:** feasibility decision | Agent + You | S06a, S06b, S07 | pending |
 | S08a | Spike the token fallback (only if S08 chose it) | Agent + You | S08 | pending |
@@ -220,7 +220,7 @@ Database tests need `docker compose up -d db` first.
 
 ### S08: Gate: feasibility decision (Agent + You, Strongest)
 
-**Context:** Arch 3 (payment rail seam), 9 and 10. PRD milestone 1 must pass before later work. **Your part:** confirm the path.
+**Context:** Arch 3 (payment rail seam), 9 and 10. PRD milestone 1 must pass before later work. **Your part:** confirm the path. S08 may start while S06b is `blocked` on PayPal's honor period: use arch Q3's fallback for whatever S06b hasn't answered yet (`refreshHold` returns `unsupported` and the pool shows "hold needs refreshing"). S44 still waits for S06b.
 **Do:**
 - Read `docs/spike/` and choose: authorize-and-capture, the Payment Method Tokens fallback, or stop.
 - Update arch 5, 7 and 10, ADR-0003 and ADR-0006, and any `plan.md` step the results change.
@@ -751,3 +751,4 @@ Every change gets one line in the Change log.
 | 2026-11-10 | Set the deadline to Nov 12, 2026, 12:00 pm Pacific | S15a read it in the Official Rules, and the owner decided to enter and follow this plan |
 | 2026-11-10 | Removed the 3-day waits from the path to S55: S50 now depends on S47a, S53a no longer waits, and S47b runs after the submission | A 3-day wait ends after the deadline. The owner approved, and the rules don't require a hold refresh |
 | 2026-11-10 | S27 counts Channel3 searches per month | S11 found the 1,000 free credits renew monthly |
+| 2026-11-10 | S06b `blocked` until 2026-11-13T07:46Z, and S08 may proceed on arch Q3's fallback while it waits | The sandbox refuses reauthorization before day 4 (`REAUTHORIZATION_TOO_SOON`), which falls after the deadline. The owner approved this in the S06b plan |
