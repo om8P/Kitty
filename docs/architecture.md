@@ -4,7 +4,7 @@ Based on `.claude/prds/kitty.prd.md`. This is a proposed design: nothing in it h
 
 ## 1. Summary
 
-Kitty is one Next.js app on an always-on Node host, with one Postgres database and one scheduled job. An owner approves one PayPal authorization for a pool, and Kitty is the single merchant. Family members and AI agents then spend from that pool in pieces, each under their own limit, allowed stores and approval threshold. Purchases are paid to Kitty in the sandbox and no real retailer order is placed.
+Kitty is one Next.js app on a long-running Node host (Render's free plan, kept awake by a schedule), with one Postgres database and one scheduled job. An owner approves one PayPal authorization for a pool, and Kitty is the single merchant. Family members and AI agents then spend from that pool in pieces, each under their own limit, allowed stores and approval threshold. Purchases are paid to Kitty in the sandbox and no real retailer order is placed.
 
 - **Kitty's ledger decides what can be spent.** PayPal may allow captures above the authorization, so every movement of funds happens in a Postgres transaction that locks the pool row, with database constraints as a backstop.
 - **Code decides, and AI can only tighten.** Hard rules run first, in code. AI review can only flag or block. Agents spend through the same path as people.
@@ -18,16 +18,16 @@ Kitty is one Next.js app on an always-on Node host, with one Postgres database a
 
 | Decision | Choice | Why | Main alternative rejected |
 |---|---|---|---|
-| App | Next.js App Router and TypeScript, run with `next start` | UI, API, webhooks and agent runner ship as one deployable | Separate backend service: a second deployable with no benefit at this size |
-| Host | Northflank Sandbox (free): one always-on service, its one Postgres add-on, one cron job | Free with no card and "always on, no sleeping", so webhooks, scheduling and long agent runs all work in one place **[verify]** | Render free: the web service sleeps, cron costs at least $1 a month, and free Postgres is deleted after about 44 days. Vercel Hobby: non-commercial only, and its terms list processing visitor payments as commercial use |
-| Database | PostgreSQL on Northflank's free add-on | Row locks, check constraints and unique indexes carry the money rules | SQLite: weak fit for concurrent writes on a hosted service |
+| App | Next.js App Router and TypeScript, built as a standalone server in a Docker image | UI, API, webhooks and agent runner ship as one deployable | Separate backend service: a second deployable with no benefit at this size |
+| Host | Render free web service built from the repo's `Dockerfile` (ADR-0002) | Free with no card. It spins down after 15 idle minutes, so the 5-minute schedule keeps it awake and the tick jobs recover work after a restart | Northflank Sandbox: asked for a card before deploying (S12). Render cron and Render Postgres: cron costs at least $1 a month, and free Postgres expires after 30 days. Vercel Hobby: non-commercial only, and its terms list processing visitor payments as commercial use |
+| Database | PostgreSQL on Supabase's free plan, through the shared session pooler (IPv4) with TLS verified against Supabase's CA | Row locks, check constraints and unique indexes carry the money rules | SQLite: weak fit for concurrent writes on a hosted service |
 | Data access | Drizzle ORM with `pg`, Zod at every boundary | SQL-first migrations, and row locks without raw SQL (confirmed in `docs/spike/S09.md`) | Prisma: row locks need raw SQL **[verify]** |
 | PayPal | Small typed `fetch` wrapper in the adapter, redirect to PayPal's approval link | Full control of `PayPal-Request-Id`, timeouts and retries, with no PayPal code in the browser | A PayPal SDK or MCP server: hides the retry behavior Kitty must own |
 | AI model | Groq free plan, `openai/gpt-oss-120b` for both agent and review, through the `groq-sdk` package, behind a model seam | Free, with published limits, tool use and strict JSON-schema output, and only one model to test | Claude API: no free tier, only a small one-time credit. Gemini 3.8 Flash: free, but its limits aren't published and free-tier content is used to improve Google's products |
 | Purchase review | One Groq call with strict JSON-schema output and no tools | Output limited to `allow`, `flag` or `block` plus a reason | Parsing free text: a malformed answer could be misread |
 | Agent loop | Manual tool-use loop, `tool_choice: auto`, Zod validation of every tool argument | Kitty saves each step, checks the finish reason every turn, caps turns and paces itself to the free token limit | An agent framework: hides the per-turn controls Kitty needs |
-| Agent execution | Background task in the always-on Node process; the request returns a run ID at once | A run can take minutes and does not fit in a request | Separate worker service: not justified yet |
-| Scheduled work | Northflank cron job (the free plan includes two jobs) posts to an authenticated `/api/internal/tick` every 5 minutes | No timers in the app, and easy to trigger by hand | Redis and a job queue: more infrastructure for one job |
+| Agent execution | Background task in the Node process; the request returns a run ID at once. The free host can restart at any time, so a stale run is closed by a tick job (S41b) | A run can take minutes and does not fit in a request | Separate worker service: not justified yet |
+| Scheduled work | A GitHub Actions schedule (`.github/workflows/schedule.yml`) posts to an authenticated `/api/internal/tick` every 5 minutes. Until S41a it calls `/api/health` | No timers in the app, free on a public repo, easy to trigger by hand, and it keeps the free host awake. GitHub may delay or skip runs, so every job must tolerate gaps | Render cron: at least $1 a month. Redis and a job queue: more infrastructure for one job |
 | Product data | Channel3 `/v1/search` behind a catalog seam, keeping only the few products each search returns | Real products with 1,000 free searches, replaceable by a seeded catalog | Channel3 MCP for the agent: the agent may have only Kitty's two tools |
 | Owner ledger | AG Grid Community | Live table with sorting, filtering and Approve and Deny cells (confirmed in `docs/spike/S09.md`) | AG Grid Enterprise: no required ledger feature is known to need it |
 | Live updates | Poll the ledger API every 2-3 seconds | Simple and fast enough for a household | WebSockets: more to run for no visible gain |
@@ -42,7 +42,9 @@ Read from each provider's site in November 2026. Free plans change, so recheck t
 
 | Service | What is free | When the limit is reached | Still to confirm |
 |---|---|---|---|
-| Northflank Sandbox | 2 services, 2 jobs, 1 database, up to $20 a month of resources, no card, "always on, no sleeping" | Not stated. With no card on file there is nothing to charge | CPU, memory, database size and build limits, which the pricing page doesn't give |
+| Render free web service | 0.1 CPU, 512 MB, 750 instance hours a month per workspace, spins down after 15 idle minutes (about a minute to wake), may restart at any time. No card needed | Hours run out: free services are suspended until next month. Bandwidth over the free amount with no card: free services are suspended | Build minutes included each month, which the docs don't state. Results in `docs/spike/S12.md` |
+| Supabase free | 2 active projects, 500 MB database. Pauses after 7 days of low activity | Pausing stops the database until it is restored from the dashboard | That no card is needed, and that the 5-minute calls prevent pausing. Results in `docs/spike/S12.md` |
+| GitHub Actions on a public repo | Free minutes. Schedules every 5 minutes at most, from the default branch only | Runs can be delayed or skipped under load. Schedules stop after 60 days with no repo activity | None |
 | Groq, `openai/gpt-oss-120b` | 30 requests a minute, 1,000 a day, 8,000 tokens a minute, 200,000 tokens a day | Reviews go to owner approval and agent runs stop | That this table is the free plan, which comes from third-party lists. No card was needed at sign-up (owner, 2026-11-10) |
 | Channel3 | 1,000 free credits a month with no card, then $0.007 a credit. A search is 1 credit and product detail is free. With no card, running out returns `402` rather than billing (`docs/spike/S11.md`) | Kitty stops at 900 a month and switches to the seeded catalog | Whether the month resets on the calendar month or the signup date |
 | PayPal sandbox, AG Grid Community, public GitHub repo | Free | No known limit that affects Kitty | None. AG Grid features were confirmed in S09 (Q9) |
@@ -82,9 +84,9 @@ flowchart LR
   owner["Owner browser and AG Grid ledger"] --> routes
   member["Family member browser"] --> routes
   owner -.->|"one approval redirect"| paypal
-  cron["Northflank cron job"] -->|"authenticated POST"| tick
+  cron["GitHub Actions schedule"] -->|"authenticated POST"| tick
 
-  subgraph app["Kitty app: one Next.js service on always-on Node"]
+  subgraph app["Kitty app: one Next.js service on Node (Render free)"]
     routes["API routes and session guard"]
     routes --> purchase["Purchase service"]
     routes --> poolsvc["Pool service"]
@@ -387,7 +389,7 @@ The refund returns money to the buyer through PayPal, but it is not spendable fr
 ### Milestone 1: Pool feasibility confirmed (thin spike)
 
 - **Spike script against the real sandbox.** One approval, authorize $150, at least three partial captures and on to a set count, replay one capture with the same `PayPal-Request-Id`, refund one capture, reauthorize, capture again, void the remainder. Log every response and webhook. This answers Q1 to Q7.
-- **Quick checks.** AG Grid Community on a sample ledger, Drizzle row locks, a test deploy on Northflank Sandbox, a Groq trial of tool calls and strict output, a sample Channel3 response, and a question to Channel3 about terms.
+- **Quick checks.** AG Grid Community on a sample ledger, Drizzle row locks, a test deploy on a free host (Render, after Northflank asked for a card), a Groq trial of tool calls and strict output, a sample Channel3 response, and a question to Channel3 about terms.
 - **Keep** only the PayPal calls, as the first draft of the adapter. **Stop** if neither partial captures nor the token fallback works.
 
 | Milestone | What it needs | Passes when |
@@ -410,7 +412,7 @@ The refund returns money to the buyer through PayPal, but it is not spendable fr
 | Q7 | Do webhooks and read APIs identify each capture and carry `invoice_id`, and which failure event arrives, `DECLINED` or `DENIED`? | Spike | Not identifiable: match on authorization, amount and time, or settle by hand sooner. Both failure events are handled regardless |
 | Q8 | Do Channel3's terms allow this use, including keeping returned products for 24 hours, and what fields does it return? | Channel3 reply, sample response. **Fields and monthly quota answered in `docs/spike/S11.md`. The terms question has been drafted and is waiting on Channel3 (S11a)** | Not allowed: set `CATALOG_PROVIDER` to seeded. 24 hours too long: keep only IDs and refresh through Channel3's free product-detail call |
 | Q9 | Does AG Grid Community cover the ledger? | Sample ledger. **Answered yes in `docs/spike/S09.md`.** No required feature is Enterprise-only | If a feature is Enterprise-only, drop it or build it outside the grid. No paid license is planned |
-| Q10 | Do Northflank Sandbox's limits fit the app, its database and its builds? | Test deploy | Move to the $0 fallback: Render's free web service, Supabase's free Postgres and a GitHub Actions scheduled call. No code change, but the service can sleep and scheduled calls can be delayed |
+| Q10 | Does a free host fit the app, its database and its builds? | Test deploy. **Northflank asked for a card, so the fallback was chosen (ADR-0002). Render results in `docs/spike/S12.md`** | If Render's limits don't fit either, the owner chooses another no-card host. The `Dockerfile` keeps the app portable |
 | Q11 | Which user group leads? | Owner's decision after research (S18 in `plan.md`) | UI emphasis only. A change of direction is re-planned before Milestone 3 |
 | Q12 | Is the free model good enough at review and agent work, and do its limits cover the demo? | Labeled test set, Groq trial | Change the prompt, or swap to Gemini 3.8 Flash through the model seam. A paid model would break the $0 budget |
 | Q13 | Would holding and delegating funds need licensing or PayPal approval? | Legal answer | Blocks live payments, which are not designed here |

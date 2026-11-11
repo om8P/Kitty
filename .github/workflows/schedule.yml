@@ -1,0 +1,36 @@
+name: Schedule
+
+# Kitty's scheduled call (ADR-0002). GitHub runs schedules only from the default
+# branch, every 5 minutes at most, and may delay or skip runs under load.
+# For S12 it calls /api/health. S41a points it at the authenticated tick.
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: schedule
+  cancel-in-progress: false
+
+jobs:
+  call:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Call the app
+        env:
+          # The app's public base URL, for example https://<name>.onrender.com.
+          # Kept as a secret so it stays out of the public repo and logs.
+          KITTY_BASE_URL: ${{ secrets.KITTY_BASE_URL }}
+        run: |
+          if [ -z "$KITTY_BASE_URL" ]; then
+            echo "::notice::KITTY_BASE_URL is not set, so there is nothing to call."
+            exit 0
+          fi
+          # A sleeping free instance can take about a minute to wake.
+          curl -fsS --max-time 120 --retry 2 --retry-delay 10 \
+            "${KITTY_BASE_URL%/}/api/health"
+          echo

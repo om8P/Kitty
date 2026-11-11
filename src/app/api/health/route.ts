@@ -1,3 +1,4 @@
+import { databaseTls } from "@/db/connection";
 import { pingDatabase } from "@/db/ping";
 
 export const dynamic = "force-dynamic";
@@ -6,10 +7,12 @@ export const dynamic = "force-dynamic";
 // restarts the app over a database problem. The body says what failed.
 export async function GET() {
   const db = await pingDatabase();
-  console.log(`health ok db=${db}`);
+  const dbTls = databaseTls();
+  console.log(`health ok db=${db} tls=${dbTls}`);
   return Response.json({
     status: "ok",
     db,
+    dbTls,
     uptimeSeconds: Math.round(process.uptime()),
   });
 }

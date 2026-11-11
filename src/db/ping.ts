@@ -1,20 +1,22 @@
 import { Client } from "pg";
+import { pgConfig } from "./connection";
 
 export type DatabaseStatus = "ok" | "error" | "unconfigured";
 
-const TIMEOUT_MS = 2000;
+const TIMEOUT_MS = 5000;
 
 /**
  * Checks that the database answers a trivial query. Returns only a status,
  * never the error text, because error messages can contain connection details.
  */
 export async function pingDatabase(
-  databaseUrl: string | undefined = process.env.DATABASE_URL,
+  env: Record<string, string | undefined> = process.env,
 ): Promise<DatabaseStatus> {
-  if (!databaseUrl) return "unconfigured";
+  const config = pgConfig(env);
+  if (!config) return "unconfigured";
 
   const client = new Client({
-    connectionString: databaseUrl,
+    ...config,
     connectionTimeoutMillis: TIMEOUT_MS,
     query_timeout: TIMEOUT_MS,
   });

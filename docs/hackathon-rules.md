@@ -100,7 +100,7 @@ A project can win at most one Grand or one Honorable Mention prize, plus one Spo
 |---|---|
 | AG Grid | Eligible once S34 ships. Community edition appears to count **[verify]** |
 | Channel3 | Eligible once S27 ships, which depends on S11a |
-| Render | Not eligible as planned, because ADR-0002 hosts on Northflank |
+| Render | Eligible once the app is hosted on Render (S12 test deploy, S48 production). ADR-0002 moved hosting to Render on 2026-11-11 |
 | APIMatic, Bryntum | Not planned |
 
 Winners must pass identity and role verification and return forms within 10 business days. They are responsible for their own taxes and fees (§8).
@@ -123,7 +123,7 @@ Winners must pass identity and role verification and return forms within 10 busi
 | C4 | High | §4 Submission Requirements | Channel3 returns real retailer products, so the video could show third-party brands and images. PayPal's own approval page will also appear | Film with the seeded catalog or brand-free products. Check with the organizers whether showing PayPal's real sandbox flow needs permission |
 | C5 | Low | §4 Intellectual Property | `rules.md` styles Kitty on PayPal's look. Its limits on logos and login-like pages already address this | Keep those limits. Fonts stay under their own licenses |
 | C6 | Low | §4 Intellectual Property, §11 | Much of the code is written with AI help, and the rules say work must be solely the entrant's. They allow outside technical help but don't mention AI coding | Disclose the tools (Overview). The rules ask entrants to request written clarification of ambiguous terms before the deadline (§11) |
-| C7 | Low | §8 | Render prizes need Render, but ADR-0002 chose Northflank. Render is already the documented fallback | No change unless S12 fails |
+| C7 | Resolved | §8 | Render prizes need Render. Northflank asked for a card in S12, so ADR-0002 now hosts on Render | None. Name Render in the submission's tools list |
 | C8 | Low | §4 Submission Requirements | S48, S49 and S52 deliver both a hosted URL and a full setup path. The rules need only one | If time is cut, the hosted URL plus a short README is enough |
 | C9 | Info | §8 | "Best Use of Agentic Commerce" bears on S18's open question of whether agents lead | Consider this at S18 |
 

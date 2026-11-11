@@ -65,7 +65,7 @@ Database tests need `docker compose up -d db` first.
 | S10 | Trial Groq tool calls and strict output | Agent + You | S02, S03 | pending |
 | S11 | Sample Channel3 and ask about its terms | Agent + You | S02, S03 | done |
 | S11a | Record Channel3's answer | You | S11 | pending |
-| S12 | Test deploy on Northflank | Agent + You | S02, S03 | in-progress |
+| S12 | Test deploy on Render and Supabase | Agent + You | S02, S03 | in-progress |
 | **Phase B: Product direction (PRD milestone 2)** | | | | |
 | S15 | Finish competitor and PayPal research | Agent | S01 | done |
 | S15a | Record the hackathon rules | Agent | S01 | done |
@@ -274,16 +274,16 @@ Database tests need `docker compose up -d db` first.
 **Do:** Record Channel3's reply in `docs/spike/S11.md`, or decide to proceed with the seeded catalog if no reply comes.
 **Done when:** an answer or the owner's decision is written down.
 
-### S12: Test deploy on Northflank (Agent + You)
+### S12: Test deploy on Render and Supabase (Agent + You)
 
-**Context:** Arch Q10, ADR-0002. The free plan's CPU, memory, database size and build limits are not published. **Your part:** connect the repo and enter any values in Northflank.
+**Context:** Arch Q10, ADR-0002. Northflank asked for a card, so S12 uses the fallback: a Render free web service, Supabase free Postgres and a GitHub Actions schedule. **Your part:** create the Render service and Supabase project, and enter the values in Render and GitHub, following `docs/spike/S12.md`.
 **Do:**
-- Add a Dockerfile if the build needs one. Deploy the scaffold with a Postgres add-on and a cron job that calls `/api/health`.
-- Record the limits found, build time, memory use and whether anything sleeps in `docs/spike/S12.md`.
+- Deploy the `Dockerfile` on Render's free plan with `DATABASE_URL` and `DATABASE_CA_CERT` from Supabase, and point `.github/workflows/schedule.yml` at it with the `KITTY_BASE_URL` repo secret.
+- Record the limits found, build time, memory use, cold start and whether anything sleeps in `docs/spike/S12.md`.
 
-**Check:** the public URL responds, the cron calls appear in the logs, and no payment method was needed.
-**Done when:** Q10 is answered, or the fallback in arch Q10 is chosen.
-**Undo:** delete the test project.
+**Check:** the public URL returns `db: "ok"` and `dbTls: "verified"`, the scheduled calls appear in the Actions and Render logs, and no payment method was needed.
+**Done when:** Q10 is answered for Render and Supabase.
+**Undo:** delete the Render service and the Supabase project, and remove the `KITTY_BASE_URL` secret.
 
 ---
 
@@ -600,7 +600,7 @@ Database tests need `docker compose up -d db` first.
 
 ### S48: Production deploy (Agent + You)
 
-**Context:** Arch 2, ADR-0002, `docs/spike/S12.md`. The free plan has one database, so reuse or delete the S12 project. **Your part:** enter secrets in Northflank and register the production webhook in PayPal.
+**Context:** Arch 2, ADR-0002, `docs/spike/S12.md`. Reuse the S12 Render service and Supabase project, since free Render allows only one always-awake service. **Your part:** enter secrets in Render and GitHub, and register the production webhook in PayPal.
 **Do:** Deploy the app, run migrations as a host job so no agent handles the production `DATABASE_URL`, and schedule the tick. Add no card. If S12 chose the fallback, use arch Q10.
 **Check:** the hosted app passes a sandbox purchase and receives its webhook.
 **Done when:** the URL is stable and the tick is running.
@@ -752,3 +752,4 @@ Every change gets one line in the Change log.
 | 2026-11-10 | Removed the 3-day waits from the path to S55: S50 now depends on S47a, S53a no longer waits, and S47b runs after the submission | A 3-day wait ends after the deadline. The owner approved, and the rules don't require a hold refresh |
 | 2026-11-10 | S27 counts Channel3 searches per month | S11 found the 1,000 free credits renew monthly |
 | 2026-11-10 | S06b `blocked` until 2026-11-13T07:46Z, and S08 may proceed on arch Q3's fallback while it waits | The sandbox refuses reauthorization before day 4 (`REAUTHORIZATION_TOO_SOON`), which falls after the deadline. The owner approved this in the S06b plan |
+| 2026-11-11 | S12 and S48 move from Northflank to Render free, Supabase free and a GitHub Actions schedule (ADR-0002) | Northflank asked for a card before deploying, and the owner declined |
