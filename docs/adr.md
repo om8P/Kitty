@@ -5,7 +5,7 @@ Key decisions behind `docs/architecture.md`. All are `proposed` because nothing 
 | ADR | Title | Status | Date |
 |---|---|---|---|
 | 0001 | One Next.js service on an always-on Node process | proposed | 2026-11-10 |
-| 0002 | Host on Northflank's free plan | proposed | 2026-11-10 |
+| 0002 | Host on Render free, Supabase free Postgres and a GitHub Actions schedule | accepted | 2026-11-11 |
 | 0003 | Kitty's ledger is the spending authority | proposed | 2026-11-10 |
 | 0004 | Hard rules run in code first, and AI can only tighten | proposed | 2026-11-10 |
 | 0005 | Use Groq's free plan behind a model seam | proposed | 2026-11-10 |
@@ -53,26 +53,31 @@ We use one Next.js App Router and TypeScript service, run with `next start`. Age
 
 ---
 
-## ADR-0002: Host on Northflank's free plan
+## ADR-0002: Host on Render free, Supabase free Postgres and a GitHub Actions schedule
 
-**Date**: 2026-11-10
-**Status**: proposed
+**Date**: 2026-11-11 (first version 2026-11-10 chose Northflank)
+**Status**: accepted
 **Deciders**: Project owner, with Claude Code
 
 ### Context
 
-The project owner set a $0 budget and asked to keep Render only if it was free and nothing better existed. Kitty needs public HTTPS webhooks, Postgres, a scheduled job and a server that stays awake during agent runs.
+The project owner set a $0 budget with no card on any service. Kitty needs public HTTPS webhooks, Postgres, a scheduled job and a server that stays awake during agent runs. The first version of this ADR chose Northflank's Sandbox plan, but in S12 Northflank asked for a card before it would deploy, even though it said the card would not be charged. The owner declined and chose the fallback this ADR already named (`docs/spike/S12.md`).
 
 ### Decision
 
-We use Northflank's free Sandbox plan for one always-on service, its one Postgres add-on and one cron job. No card is added.
+- **App:** one Render free web service, built from the repo's `Dockerfile`.
+- **Database:** a Supabase free project, reached through its shared session pooler (IPv4) with TLS checked against Supabase's CA (`DATABASE_CA_CERT`).
+- **Schedule:** a GitHub Actions workflow (`.github/workflows/schedule.yml`) calls the app every 5 minutes. That replaces a host cron job and keeps the free instance and the free database from going idle.
+- No card is added anywhere.
 
 ### Alternatives Considered
 
-#### Render free
-- **Pros**: No card needed for the web service, and well documented.
-- **Cons**: The server sleeps after 15 idle minutes, and free Postgres is deleted after about 44 days.
-- **Why not**: Cron jobs cost at least $1 a month, so the design would not be free there.
+#### Northflank Sandbox
+- **Pros**: Always on, with Postgres and cron in one place.
+- **Why not**: It asked for a card before deploying (S12, 2026-11-11).
+
+#### Render free for everything
+- **Why not**: Render cron jobs cost at least $1 a month, and free Render Postgres expires 30 days after creation.
 
 #### Vercel Hobby
 - **Pros**: Native Next.js hosting that does not sleep.
@@ -82,13 +87,18 @@ We use Northflank's free Sandbox plan for one always-on service, its one Postgre
 ### Consequences
 
 #### Positive
-- Hosting, database and scheduling are in one place and stay awake.
+- Everything is free with no card, and Render is a hackathon sponsor, so Kitty becomes eligible for the Render prize (`docs/hackathon-rules.md`).
+- The `Dockerfile` keeps the app portable to another host.
 
 #### Negative
-- The free plan offers no scaling, and the app depends on one provider's free terms.
+- A free Render instance (0.1 CPU, 512 MB) spins down after 15 minutes with no inbound traffic and takes about a minute to wake. Render may also restart it at any time, so agent runs and in-flight work must recover through the tick jobs (S41a, S41b) rather than rely on an always-on process.
+- 750 free instance hours a month per workspace covers one always-awake service, not two.
+- GitHub may delay or skip scheduled runs, so the schedule is best effort, and it only runs from `main`.
+- Supabase pauses free projects after 7 days of low activity. The 5-minute calls are expected to prevent that **[verify]**.
 
 #### Risks
-- The pricing page gives no CPU, memory, database size or build limits. A test deploy checks them. The fallback is Render's free web service, Supabase's free Postgres and a GitHub Actions schedule.
+- If the schedule lapses, PayPal webhooks may hit a sleeping instance. PayPal retries failed deliveries, so the cost is delay rather than loss.
+- Render's terms say free instances are not for production. Kitty is a sandbox-only demo.
 
 ---
 

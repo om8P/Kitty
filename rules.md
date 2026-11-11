@@ -13,7 +13,7 @@ Shared PayPal spending pools for families and AI agents. An owner approves one P
 
 ## Stack
 
-Next.js App Router and TypeScript on Northflank's free plan, Postgres with Drizzle, Zod, Vitest, PayPal sandbox REST through a small `fetch` wrapper, Groq free plan (`openai/gpt-oss-120b` through `groq-sdk`), Channel3 for products and AG Grid Community for the ledger.
+Next.js App Router and TypeScript on Render's free web service, Postgres on Supabase's free plan with Drizzle, a GitHub Actions schedule, Zod, Vitest, PayPal sandbox REST through a small `fetch` wrapper, Groq free plan (`openai/gpt-oss-120b` through `groq-sdk`), Channel3 for products and AG Grid Community for the ledger.
 
 ```bash
 npm run lint && npm run typecheck && npm test
