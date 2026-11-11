@@ -11,6 +11,7 @@ Key decisions behind `docs/architecture.md`. Most are still `proposed`. ADR-0002
 | 0005 | Use Groq's free plan behind a model seam | proposed | 2026-11-10 |
 | 0006 | Build pools on PayPal authorization and partial capture | accepted (S08, 2026-11-11) | 2026-11-10 |
 | 0007 | Keep Channel3 behind a catalog seam with minimal storage | proposed | 2026-11-10 |
+| 0008 | Product direction: continue, both user groups equal, honest hold wording, adversarial demo | accepted | 2026-11-11 |
 
 ---
 
@@ -304,3 +305,47 @@ Channel3 `/v1/search` sits behind a catalog seam. Kitty stores only the products
 
 #### Risks
 - The terms may not allow this use at all. Question Q8 covers this, and `CATALOG_PROVIDER` can switch to the seeded catalog. S11 found that the 1,000 free credits renew monthly, and that Channel3's caching guide suggests a shorter retention than 24 hours (`docs/spike/S11.md`).
+
+---
+
+## ADR-0008: Product direction: continue, both user groups equal, honest hold wording, adversarial demo
+
+**Date**: 2026-11-11
+**Status**: accepted (S18)
+**Deciders**: Project owner, with Claude Code
+
+### Context
+
+The S18 gate asks whether to continue, which user group leads, and whether to make four product changes: position Kitty as a shopping service, make agents the lead audience, reword "reserved", and add an adversarial demo moment. There are no interviews, so this is the owner's decision on the research. `docs/research.md` finds the AI-agent problem better supported than the family one, finds that PayPal offers no reserved, shared budget, and finds at least four hackathon entries with limits or approvals, one aimed at households. PayPal firmly honors an authorization for only 3 of its 29 days (`docs/research.md` section 4, PayPal's two-step payments page).
+
+### Decision
+
+- **Continue** with the current direction: a household layer on PayPal, not a rival to it.
+- **Both user groups stay equal.** The shared story stays a parent delegating a grocery budget to an AI agent and a teen. Agents are not made the lead audience.
+- **Reword "reserved"** in user-facing text to say the money is held on the owner's PayPal, without promising a guaranteed reservation for the whole term. The ledger's internal names (`reserved_cents`) do not change.
+- **Add an adversarial demo moment.** A product listing tries to manipulate the AI agent or reviewer, and the hard rules still stop the purchase.
+- **No shopping-service framing,** and the word "pool" is kept.
+
+### Alternatives Considered
+
+#### Lead with AI-agent users
+- **Pros**: Stronger survey support, and it matches the "Best Use of Agentic Commerce" prize.
+- **Cons**: Weakens the shared family story that sets Kitty apart from agent-only products.
+- **Why not**: The owner chose to keep both groups equal.
+
+#### Position Kitty as a shopping service
+- **Pros**: Explains why spending happens only at Kitty's marketplace.
+- **Cons**: Moves the focus away from the PayPal hold and the shared rules.
+- **Why not**: The owner kept the spending-layer framing.
+
+### Consequences
+
+#### Positive
+- The pitch claims only what PayPal guarantees, which also fits judging on credibility.
+- The adversarial moment shows the hard rules working, which the four rival entries don't show.
+
+#### Negative
+- Without a lead group, the demo has to serve two audiences within 3 minutes.
+
+#### Risks
+- "Pool" still collides with PayPal Pools. Screens must keep Kitty's own name and the "Sandbox" label so no one mistakes Kitty for PayPal (`rules.md`).
