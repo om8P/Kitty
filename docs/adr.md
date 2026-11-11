@@ -1,6 +1,6 @@
 # Kitty Architecture Decision Records
 
-Key decisions behind `docs/architecture.md`. All are `proposed` because nothing has been built and the PayPal behavior is untested.
+Key decisions behind `docs/architecture.md`. Most are still `proposed`. ADR-0002 and ADR-0006 are `accepted`, and ADR-0003 has a recorded S08 note.
 
 | ADR | Title | Status | Date |
 |---|---|---|---|
@@ -9,7 +9,7 @@ Key decisions behind `docs/architecture.md`. All are `proposed` because nothing 
 | 0003 | Kitty's ledger is the spending authority | proposed | 2026-11-10 |
 | 0004 | Hard rules run in code first, and AI can only tighten | proposed | 2026-11-10 |
 | 0005 | Use Groq's free plan behind a model seam | proposed | 2026-11-10 |
-| 0006 | Build pools on PayPal authorization and partial capture | proposed, depends on the Milestone 1 sandbox spike | 2026-11-10 |
+| 0006 | Build pools on PayPal authorization and partial capture | accepted (S08, 2026-11-11) | 2026-11-10 |
 | 0007 | Keep Channel3 behind a catalog seam with minimal storage | proposed | 2026-11-10 |
 
 ---
@@ -141,6 +141,9 @@ Every movement of funds happens in a short Postgres transaction that locks the p
 #### Risks
 - PayPal's replay behavior and refund capacity are untested. Questions Q5 and Q6 cover them, and a ledger mismatch pauses the pool.
 
+#### S08 note (2026-11-11)
+The owner confirmed authorize-and-capture as the payment path, based on `docs/spike/S05.md`. One sandbox authorization took 30 partial captures with no PayPal approval step. Replaying a capture with the same `PayPal-Request-Id` returned the original capture and moved no money, within at least one hour. The spike also found that a replay response echoes the replayed request's amount, so the ledger settles a capture from the purchase's own amount and the returned capture ID, never from the response amount (arch 7.2). Refund capacity (Q6) is still open and is checked in S06a.
+
 ---
 
 ## ADR-0004: Hard rules run in code first, and AI can only tighten
@@ -225,12 +228,12 @@ We use Groq's free plan with `openai/gpt-oss-120b` for both jobs, through `groq-
 ## ADR-0006: Build pools on PayPal authorization and partial capture
 
 **Date**: 2026-11-10
-**Status**: proposed (depends on the Milestone 1 sandbox spike)
+**Status**: accepted (S08, 2026-11-11)
 **Deciders**: Project owner, with Claude Code
 
 ### Context
 
-Kitty's core promise is one approval, then spending in pieces. PayPal fixes the payee when the order is created, so Kitty is the single merchant. Authorizations last 29 days, with funds firmly honored for 3. Multiple partial captures are untested on this sandbox account.
+Kitty's core promise is one approval, then spending in pieces. PayPal fixes the payee when the order is created, so Kitty is the single merchant. Authorizations last 29 days, with funds firmly honored for 3. Multiple partial captures were untested on this sandbox account when this ADR was written. S05 later confirmed them.
 
 ### Decision
 
@@ -259,6 +262,9 @@ Each pool is one PayPal order with `intent: AUTHORIZE`, and each purchase is a p
 
 #### Risks
 - If neither partial captures nor the fallback work, Milestone 1 fails. Questions Q1 to Q4 cover this.
+
+#### S08 result (2026-11-11)
+Accepted. S05 answered Q1 (yes, with no PayPal approval step) and gave a lower bound for Q2 (30 captures on one authorization, with no cap hit). PayPal's developer pages reviewed on 2026-11-11 state no maximum number of captures, only an amount cap and the 29-day window, so Q2 stays a lower bound. Q3 uses its stated fallback while S06b waits for day 4 (`refreshHold` returns `unsupported` and the pool shows "hold needs refreshing"). Q4, Q6 and Q7 are checked against the built code in S06a, S07 and M4. The Payment Method Tokens fallback (S08a) is skipped. Sandbox accounts must be able to transact in USD, so the README tells judges to use US sandbox accounts.
 
 ---
 

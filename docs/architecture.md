@@ -178,6 +178,8 @@ sequenceDiagram
 4. Kitty saves the authorization with `honor_ends_at` (3 days) and `expires_at` (29 days), takes `authorized_cents` from PayPal's response, and sets `active`.
 5. `PAYMENT.AUTHORIZATION.CREATED` confirms it. If the owner never returns, the tick marks the pool `abandoned`.
 
+Approval can fail on PayPal's page with no API signal. In S05, a non-US sandbox buyer saw "This seller doesn't accept payments in your currency" and the order stayed `PAYER_ACTION_REQUIRED`. The pool then stays `awaiting_payer` until the tick marks it `abandoned`. Pool state is read from the authorization, never from the order, because the order turns `COMPLETED` after the first capture while the authorization keeps taking captures.
+
 ### 5.2 A purchase
 
 Everything uses `submitPurchase(context, productId, quantity, idempotencyKey)`. The context comes from the session for a person and the `agent_runs` row for an agent. The key is a per-checkout ID for a person and `runId:toolUseId` for an agent, so a repeated call finds the same purchase.
@@ -188,7 +190,7 @@ Everything uses `submitPurchase(context, productId, quantity, idempotencyKey)`. 
 4. **Strictest outcome wins.** The rules say `proceed`, or `needs_approval` when `amount > approval_threshold_cents`, so a $0 threshold means every purchase needs approval. AI `allow` changes nothing, `flag` means `needs_approval`, and `block` means stop.
 5. **Reserve** (Tx B, pool locked). Re-run the hard rules, move funds from available to reserved, store the authorization ID and set `capturing`.
 6. **Capture** (no transaction). `POST /v2/payments/authorizations/{id}/capture` with a partial `amount`, `final_capture: false` and the purchase's request ID.
-7. **Settle** (Tx C, pool locked). Success moves reserved to captured. A definite failure returns funds to available. An unknown outcome leaves them reserved (section 7.2).
+7. **Settle** (Tx C, pool locked). Success moves reserved to captured, using the purchase's own amount and the returned capture ID, never the amount in the capture response. A definite failure returns funds to available. An unknown outcome leaves them reserved (section 7.2).
 
 "Usable" means the hold has not expired or been voided. A hold past its 3-day honor period still passes, with a warning, because a capture may still succeed and a failure is handled.
 
@@ -323,6 +325,7 @@ Rejected: serializable isolation (needs retry logic) and a single conditional `U
 - **Only a definite failure releases funds.** A timeout, dropped connection, 5xx, unreadable response or any status that is neither clearly completed nor clearly failed sets `capture_unknown`. Funds stay reserved.
 - **Settling an unknown.** Replay the same request inside the window measured in Q5, or accept a verified `PAYMENT.CAPTURE.COMPLETED` matched by capture ID or `invoice_id` **[verify]**. After the window, stop sending POSTs and read PayPal's record **[verify]**. If it is still unresolved, the pool is `paused` and a small admin script settles it after checking the sandbox.
 - **No second attempt on a new ID.** After a definite failure, any new try is a new purchase with full checks.
+- **Never trust a replay's amount.** S05 showed that a replay answers 200 where the original answered 201, and that PayPal does not check the replayed body: a replay with a different amount returns the original capture but echoes the new amount. The ledger therefore settles from the purchase's own fixed amount and the returned capture ID. If an amount ever disagrees, read the capture with `getCapture`.
 
 Other calls use the same pattern: `kitty-order-{pool.id}`, `kitty-auth-{pool.id}`, `kitty-reauth-{authorization.id}`, `kitty-void-{authorization.id}` and `kitty-refund-{purchase.id}`. Whether each endpoint honors the header is **[verify]**.
 
@@ -403,13 +406,13 @@ The refund returns money to the buyer through PayPal, but it is not spendable fr
 
 | # | Question | Answered by | What a different result changes |
 |---|---|---|---|
-| Q1 | Are multiple partial captures enabled, and does the account need PayPal approval? | Spike | No: seek approval or swap in the token adapter. If neither works, Milestone 1 fails |
-| Q2 | How many captures can one authorization take? | Spike | A low cap becomes a hard rule and is shown at pool setup |
-| Q3 | Can a partly spent authorization be reauthorized, from which ID, when, how often, and what balance carries over? | Spike | Refused: `refreshHold` returns `unsupported` and pools show "hold needs refreshing". Less carried over: `available` is also capped by the current hold |
-| Q4 | Can the remainder be voided after partial captures, including on a reauthorized hold? | Spike | No: the close screen says the hold lapses by day 29, and `final_capture: true` is considered for a known last purchase |
-| Q5 | Does replaying a `PayPal-Request-Id` return the original result, on which endpoints, and for how long? | Spike | Short window: replay less and read sooner. Unsafe replay: read-only settlement only |
-| Q6 | Does a refund restore authorization capacity? | Spike | Yes: change the ledger formulas and check constraint, then decide whether member limits are also restored |
-| Q7 | Do webhooks and read APIs identify each capture and carry `invoice_id`, and which failure event arrives, `DECLINED` or `DENIED`? | Spike | Not identifiable: match on authorization, amount and time, or settle by hand sooner. Both failure events are handled regardless |
+| Q1 | Are multiple partial captures enabled, and does the account need PayPal approval? | Spike. **Answered yes in `docs/spike/S05.md`:** partial captures work with no PayPal approval step (S08 accepted this path, ADR-0006) | No: seek approval or swap in the token adapter. If neither works, Milestone 1 fails |
+| Q2 | How many captures can one authorization take? | Spike. **At least 30 (`docs/spike/S05.md`).** PayPal's developer pages state no count limit, only the amount cap and the 29-day window | A low cap becomes a hard rule and is shown at pool setup |
+| Q3 | Can a partly spent authorization be reauthorized, from which ID, when, how often, and what balance carries over? | Spike. **Blocked until 2026-11-13T07:46Z (`docs/spike/S06b.md`), so the fallback applies until S06b runs** | Refused: `refreshHold` returns `unsupported` and pools show "hold needs refreshing". Less carried over: `available` is also capped by the current hold |
+| Q4 | Can the remainder be voided after partial captures, including on a reauthorized hold? | Spike. **Checked in S06a and M4 (N3)** | No: the close screen says the hold lapses by day 29, and `final_capture: true` is considered for a known last purchase |
+| Q5 | Does replaying a `PayPal-Request-Id` return the original result, on which endpoints, and for how long? | Spike. **Answered for at least 1 hour in `docs/spike/S05.md`.** Replays return the original capture, but echo the replayed amount (see 7.2) | Short window: replay less and read sooner. Unsafe replay: read-only settlement only |
+| Q6 | Does a refund restore authorization capacity? | Spike. **Checked in S06a and M4 (N3).** Until then refunds create no spendable money (7.3) | Yes: change the ledger formulas and check constraint, then decide whether member limits are also restored |
+| Q7 | Do webhooks and read APIs identify each capture and carry `invoice_id`, and which failure event arrives, `DECLINED` or `DENIED`? | Spike. **Checked in S07 (N3).** Both failure events are handled regardless | Not identifiable: match on authorization, amount and time, or settle by hand sooner. Both failure events are handled regardless |
 | Q8 | Do Channel3's terms allow this use, including keeping returned products for 24 hours, and what fields does it return? | Channel3 reply, sample response. **Fields and monthly quota answered in `docs/spike/S11.md`. The terms question has been drafted and is waiting on Channel3 (S11a)** | Not allowed: set `CATALOG_PROVIDER` to seeded. 24 hours too long: keep only IDs and refresh through Channel3's free product-detail call |
 | Q9 | Does AG Grid Community cover the ledger? | Sample ledger. **Answered yes in `docs/spike/S09.md`.** No required feature is Enterprise-only | If a feature is Enterprise-only, drop it or build it outside the grid. No paid license is planned |
 | Q10 | Does a free host fit the app, its database and its builds? | Test deploy. **Northflank asked for a card, so the fallback was chosen (ADR-0002). Render results in `docs/spike/S12.md`** | If Render's limits don't fit either, the owner chooses another no-card host. The `Dockerfile` keeps the app portable |
