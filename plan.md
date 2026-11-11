@@ -89,7 +89,7 @@ Database tests need `docker compose up -d db` first. From step M2 on, the race t
 | S08 | **Gate:** record the feasibility decision | Agent + You | S05 | done | D | N1 |
 | S08a | Spike the token fallback (only if S08 chose it) | Agent + You | S08 | skipped | D | N1 |
 | S09 | Check AG Grid and Drizzle row locks | Agent | S03 | done | |  |
-| S10 | Trial Groq tool calls and strict output | Agent + You | S02, S03 | pending | D | N2 |
+| S10 | Trial Groq tool calls and strict output | Agent + You | S02, S03 | done | D | N2 |
 | S11 | Sample Channel3 and ask about its terms | Agent + You | S02, S03 | done | |  |
 | S11a | Record Channel3's answer | You | S11 | pending | D | N3 |
 | S12 | Test deploy on Render and Supabase | Agent + You | S02, S03 | done | |  |
@@ -104,7 +104,7 @@ Database tests need `docker compose up -d db` first. From step M2 on, the race t
 | M4 | Walk the built flows against the PayPal sandbox | Agent + You | M1, M3, S06a | pending | D | N3 |
 | M5 | Reconcile the code and the architecture | Agent | M1 | done | D | N1 |
 | **Phase C: Shared pools (PRD milestone 3), MVP built** | | | | | | |
-| S19 | Drizzle schema, migrations and the missing tables | Agent | M1, M2 | in-progress | D | N2 |
+| S19 | Drizzle schema, migrations and the missing tables | Agent | M1, M2 | done | D | N2 |
 | S20 | Ledger module | Agent | M2 | in-progress | P | I1 |
 | S21 | Hard rules | Agent | S19 | done | |  |
 | S22 | Payment rail seam | Agent | S08 | in-progress | D | N4 |
@@ -113,9 +113,9 @@ Database tests need `docker compose up -d db` first. From step M2 on, the race t
 | S25 | Members and rules | Agent | S19, S23, S24 | in-progress | D | N4 |
 | S26 | Catalog seam and marketplace | Agent | S19, S23 | done | |  |
 | S27 | Channel3 adapter | Agent | S11a, S26 | in-progress | D | N4 |
-| S28 | Model seam and Groq adapter | Agent | S10, S19 | in-progress | D | N2 |
+| S28 | Model seam and Groq adapter | Agent | S10, S19 | done | D | N2 |
 | S29 | AI purchase reviewer | Agent | S28 | done | |  |
-| S29a | Strict review schema | Agent | S10, S29 | pending | D | N2 |
+| S29a | Strict review schema | Agent | S10, S29 | done | D | N2 |
 | S30 | Purchase service: checks and review | Agent | S20, S21, S26, S29 | done | |  |
 | S31 | Purchase service: reserve and capture | Agent | S22, S30 | done | |  |
 | S32 | Member buying screens | Agent + You | S31 | in-progress | D | N3 |
@@ -728,7 +728,7 @@ Each step starts with **MVP status** (what the code already does) and lists what
 ### S48: Production deploy (Agent + You)
 
 **Context:** Arch 2, ADR-0002, `docs/spike/S12.md`. Reuse the S12 Render service and Supabase project, since free Render allows only one always-awake service. **Your part:** enter secrets in Render and GitHub, and register the production webhook in PayPal.
-**Do:** Deploy the app, set `APP_URL` so PayPal's return links are correct, and schedule the tick (S41a). Until S19 adds migrations the app creates its schema at startup, so no agent needs to handle the production `DATABASE_URL`. After S19, run migrations as a host job instead. M3 makes the app refuse to start in production without `DATABASE_URL`. Add no card. If S12 chose the fallback, use arch Q10.
+**Do:** Deploy the app, set `APP_URL` so PayPal's return links are correct, and schedule the tick (S41a). The app applies the Drizzle migrations in `drizzle/` at startup (S19, ADR-0010), so no agent needs to handle the production `DATABASE_URL`. On the first deploy after S19, check the startup log for the migration step and that the S12 database kept its rows. M3 makes the app refuse to start in production without `DATABASE_URL`. Add no card. If S12 chose the fallback, use arch Q10.
 **Check:** the hosted app passes a sandbox purchase and receives its webhook. The scheduled calls appear in the GitHub Actions log, and the app stays awake across several hours (the part of S12 left open).
 **Done when:** the URL is stable and the tick is running.
 
@@ -900,3 +900,6 @@ Every change gets one line in the Change log.
 | 2026-11-11 | S18 `done`: continue, both user groups equal, reword "reserved" to the PayPal hold, add an adversarial demo moment, keep "pool" and no shopping-service framing (ADR-0008). The owner approved the PRD edits, and PRD milestone 2 is complete | The owner's decision on the S15 research |
 | 2026-11-11 | M1 `done`. N1 runs on `session/N1-land-harden` instead of `step/mvp-demo-flow`, here and in `rules.md` | Pull request 16 had already merged the MVP to `main` |
 | 2026-11-11 | M2, M3 and M5 `done`. M5's list is `docs/arch-reconciliation.md`. S28 now also adds a wall-clock cap to agent runs, and the model and catalog seams and the `authorize` ledger entry are amended in the arch (ADR-0009) | M5 found these three differences on no list, and the owner chose how to resolve each |
+| 2026-11-11 | S19, S10, S28 and S29a `done` (session N2). Drizzle owns the schema and migrations, and the domain keeps parameterized SQL behind the transaction port (ADR-0010, owner's choice). The `stores`, `member_stores` and `authorizations` tables and the new columns exist. The model seam uses `groq-sdk`, and the reviewer uses strict schema. S48's migration note is updated | The owner kept the arch's choices, and Drizzle's driver returns dates as strings for raw SQL, so the port stays on `pg` |
+| 2026-11-11 | S10's results, run on 2026-11-10 but never committed, were brought over from the old `step/S10-groq-trial` worktree with the owner's console limits. No new trial ran | Saves Groq quota. The trial's findings still hold |
+| 2026-11-11 | The N2 re-run of M5 found one open difference: `pool_members` has an `active` flag where arch 6 lists a status | For the owner to decide before S25 |

@@ -1,5 +1,6 @@
 import type { Capabilities } from "@/lib/views";
 import type { Database } from "@/domain/ports";
+import { SELECT_MEMBERS } from "@/domain/stores";
 import { DomainError, type MemberRow, type PoolRow } from "@/domain/types";
 import type { Container } from "./container";
 import type { Session } from "./session";
@@ -33,7 +34,7 @@ export async function findMemberPool(
   session: Session,
 ): Promise<{ pool: PoolRow; member: MemberRow } | null> {
   const [member] = await db.query<MemberRow>(
-    `SELECT m.* FROM pool_members m JOIN pools p ON p.id = m.pool_id
+    `${SELECT_MEMBERS} JOIN pools p ON p.id = m.pool_id
      WHERE m.user_id = $1 AND p.household_id = $2 AND p.status = 'active'
      ORDER BY p.created_at DESC LIMIT 1`,
     [session.user.id, session.householdId],

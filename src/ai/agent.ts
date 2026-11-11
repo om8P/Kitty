@@ -9,6 +9,7 @@
 import { z } from "zod";
 import { formatUsd } from "@/domain/money";
 import type { Catalog, Database } from "@/domain/ports";
+import { SELECT_MEMBERS } from "@/domain/stores";
 import { submitPurchase, type PurchaseDeps } from "@/domain/purchases";
 import { memberRemaining } from "@/domain/rules";
 import {
@@ -29,9 +30,15 @@ export type AgentDeps = {
   model: Model;
   catalog: Catalog;
   purchases: PurchaseDeps;
+  /** Milliseconds since the epoch. Tests control it. */
+  now?: () => number;
+  /** The wall-clock cap on one run (architecture 5.7). */
+  maxRunMs?: number;
 };
 
 const MAX_TURNS = 8;
+/** A run stops after this long. A stale run is also reclaimed after 3 minutes without a heartbeat. */
+export const MAX_RUN_MS = 3 * 60_000;
 const MAX_PURCHASE_REQUESTS = 6;
 const MAX_TASK_LENGTH = 300;
 
@@ -88,7 +95,7 @@ export async function startAgentRun(
   if (pool.status !== "active") throw new DomainError("conflict", "This pool isn't open for spending.");
 
   const [member] = await db.query<MemberRow>(
-    "SELECT * FROM pool_members WHERE pool_id = $1 AND kind = 'agent' AND active ORDER BY position LIMIT 1",
+    `${SELECT_MEMBERS} WHERE pool_id = $1 AND kind = 'agent' AND active ORDER BY position LIMIT 1`,
     [pool.id],
   );
   if (!member) throw new DomainError("conflict", "This pool has no shopping agent.");
@@ -113,11 +120,13 @@ export async function startAgentRun(
 /** Runs the loop to the end. Never throws: every failure ends the run with a plain message. */
 export async function runAgent(deps: AgentDeps, runId: string): Promise<void> {
   const { db, model, catalog } = deps;
+  const now = deps.now ?? Date.now;
+  const deadline = now() + (deps.maxRunMs ?? MAX_RUN_MS);
   try {
     const [run] = await db.query<AgentRunRow>("SELECT * FROM agent_runs WHERE id = $1", [runId]);
     if (!run || run.status !== "running") return;
     const [pool] = await db.query<PoolRow>("SELECT * FROM pools WHERE id = $1", [run.pool_id]);
-    const [member] = await db.query<MemberRow>("SELECT * FROM pool_members WHERE id = $1", [run.member_id]);
+    const [member] = await db.query<MemberRow>(`${SELECT_MEMBERS} WHERE id = $1`, [run.member_id]);
 
     const steps: AgentStep[] = [];
     const addStep = async (step: AgentStep) => {
@@ -135,7 +144,17 @@ export async function runAgent(deps: AgentDeps, runId: string): Promise<void> {
     let purchaseRequests = 0;
 
     for (let turn = 0; turn < MAX_TURNS; turn++) {
-      const reply = await model.chat({ messages, tools: TOOLS, maxTokens: 1500 });
+      if (now() >= deadline) {
+        return finish(
+          db,
+          runId,
+          "failed",
+          null,
+          "The agent is unavailable: it ran past its time limit. Purchases already made still stand.",
+        );
+      }
+      // Low reasoning effort was enough for choosing tools in S10, and keeps turns small.
+      const reply = await model.chat({ messages, tools: TOOLS, maxTokens: 1500, reasoningEffort: "low" });
       if (!reply.ok) {
         const why =
           reply.reason === "not_configured"

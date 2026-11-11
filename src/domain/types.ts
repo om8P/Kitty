@@ -36,9 +36,11 @@ export type MemberRow = {
   active: boolean;
   limit_cents: number;
   approval_threshold_cents: number;
+  /** Read from `member_stores` by SELECT_MEMBERS, in the owner's order. */
   allowed_stores: string[];
   reserved_cents: number;
   captured_cents: number;
+  refunded_cents: number;
   position: number;
 };
 
@@ -78,6 +80,9 @@ export type PurchaseRow = {
   agent_run_id: string | null;
   created_at: Date;
   updated_at: Date;
+  needs_attention: boolean;
+  approval_expires_at: Date | null;
+  decided_by: string | null;
 };
 
 export type ProductRow = {

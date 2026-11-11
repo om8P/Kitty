@@ -1,126 +1,304 @@
 /**
- * The schema, as idempotent SQL that runs once per process start. Money is
- * integer cents. The CHECK constraints are the last line of defense against
- * overspending: Postgres refuses any row where a pool or a member would hold
- * more than it was given (architecture 7.1).
+ * The database schema in Drizzle (architecture 2 and 6, ADR-0010). Migrations
+ * in `drizzle/` are generated from this file with `npm run db:generate` and
+ * reviewed as SQL. Money is integer cents.
+ *
+ * The CHECK constraints are the last line of defense against overspending:
+ * Postgres refuses any row where a pool or a member would hold more than it
+ * was given (architecture 7.1).
+ *
+ * Constraint names are spelled out and match what Postgres named the MVP's
+ * inline constraints, so a database the MVP made and one built from the
+ * migrations are the same, and later migrations can refer to them by name.
  */
-export const SCHEMA_STATEMENTS: string[] = [
-  `CREATE TABLE IF NOT EXISTS households (
-    id TEXT PRIMARY KEY,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-  )`,
-  `CREATE TABLE IF NOT EXISTS users (
-    id TEXT PRIMARY KEY,
-    household_id TEXT NOT NULL REFERENCES households(id),
-    name TEXT NOT NULL,
-    role TEXT NOT NULL CHECK (role IN ('owner', 'member'))
-  )`,
-  `CREATE TABLE IF NOT EXISTS pools (
-    id TEXT PRIMARY KEY,
-    household_id TEXT NOT NULL REFERENCES households(id),
-    owner_user_id TEXT NOT NULL REFERENCES users(id),
-    goal TEXT NOT NULL,
-    status TEXT NOT NULL CHECK (status IN ('draft', 'awaiting_payer', 'active', 'closing', 'closed', 'abandoned')),
-    term_days INTEGER NOT NULL CHECK (term_days BETWEEN 1 AND 28),
-    ends_at TIMESTAMPTZ NOT NULL,
-    rail TEXT NOT NULL,
-    requested_cents INTEGER NOT NULL CHECK (requested_cents > 0),
-    authorized_cents INTEGER NOT NULL DEFAULT 0 CHECK (authorized_cents >= 0),
-    reserved_cents INTEGER NOT NULL DEFAULT 0 CHECK (reserved_cents >= 0),
-    captured_cents INTEGER NOT NULL DEFAULT 0 CHECK (captured_cents >= 0),
-    refunded_cents INTEGER NOT NULL DEFAULT 0 CHECK (refunded_cents >= 0),
-    released_cents INTEGER NOT NULL DEFAULT 0 CHECK (released_cents >= 0),
-    paypal_order_id TEXT UNIQUE,
-    authorization_id TEXT,
-    hold_expires_at TIMESTAMPTZ,
-    note TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    closed_at TIMESTAMPTZ,
-    CONSTRAINT pools_never_overspent CHECK (reserved_cents + captured_cents + released_cents <= authorized_cents),
-    CONSTRAINT pools_refund_within_captured CHECK (refunded_cents <= captured_cents)
-  )`,
-  `CREATE TABLE IF NOT EXISTS pool_members (
-    id TEXT PRIMARY KEY,
-    pool_id TEXT NOT NULL REFERENCES pools(id),
-    kind TEXT NOT NULL CHECK (kind IN ('person', 'agent')),
-    user_id TEXT REFERENCES users(id),
-    label TEXT NOT NULL,
-    active BOOLEAN NOT NULL DEFAULT TRUE,
-    limit_cents INTEGER NOT NULL CHECK (limit_cents >= 0),
-    approval_threshold_cents INTEGER NOT NULL CHECK (approval_threshold_cents >= 0),
-    allowed_stores JSONB NOT NULL,
-    reserved_cents INTEGER NOT NULL DEFAULT 0 CHECK (reserved_cents >= 0),
-    captured_cents INTEGER NOT NULL DEFAULT 0 CHECK (captured_cents >= 0),
-    position INTEGER NOT NULL DEFAULT 0,
-    CONSTRAINT members_never_over_limit CHECK (reserved_cents + captured_cents <= limit_cents)
-  )`,
-  `CREATE TABLE IF NOT EXISTS products (
-    id TEXT PRIMARY KEY,
-    source TEXT NOT NULL CHECK (source IN ('seed', 'channel3')),
-    external_id TEXT NOT NULL,
-    store TEXT NOT NULL,
-    title TEXT NOT NULL,
-    description TEXT NOT NULL DEFAULT '',
-    image_url TEXT,
-    price_cents INTEGER NOT NULL CHECK (price_cents > 0),
-    fetched_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE (source, external_id)
-  )`,
-  `CREATE TABLE IF NOT EXISTS agent_runs (
-    id TEXT PRIMARY KEY,
-    pool_id TEXT NOT NULL REFERENCES pools(id),
-    member_id TEXT NOT NULL REFERENCES pool_members(id),
-    task TEXT NOT NULL,
-    status TEXT NOT NULL CHECK (status IN ('running', 'finished', 'failed')),
-    steps JSONB NOT NULL DEFAULT '[]'::jsonb,
-    summary TEXT,
-    error TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    heartbeat_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    finished_at TIMESTAMPTZ
-  )`,
-  `CREATE UNIQUE INDEX IF NOT EXISTS agent_runs_one_open_per_member
-    ON agent_runs (member_id) WHERE status = 'running'`,
-  `CREATE TABLE IF NOT EXISTS purchases (
-    id TEXT PRIMARY KEY,
-    pool_id TEXT NOT NULL REFERENCES pools(id),
-    member_id TEXT NOT NULL REFERENCES pool_members(id),
-    product_id TEXT NOT NULL,
-    product_title TEXT NOT NULL,
-    store TEXT NOT NULL,
-    quantity INTEGER NOT NULL CHECK (quantity BETWEEN 1 AND 20),
-    amount_cents INTEGER NOT NULL CHECK (amount_cents > 0),
-    status TEXT NOT NULL CHECK (status IN (
-      'rejected_by_rules', 'reviewing', 'blocked_by_ai', 'awaiting_approval', 'denied', 'expired',
-      'capturing', 'captured', 'capture_failed', 'capture_unknown', 'refund_pending', 'refunded'
-    )),
-    rule_code TEXT,
-    message TEXT,
-    ai_decision TEXT,
-    ai_reason TEXT,
-    approval_reason TEXT,
-    authorization_id TEXT,
-    capture_id TEXT,
-    refund_id TEXT,
-    idempotency_key TEXT NOT NULL UNIQUE,
-    agent_run_id TEXT REFERENCES agent_runs(id),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-  )`,
-  `CREATE INDEX IF NOT EXISTS purchases_by_pool ON purchases (pool_id, created_at)`,
-  `CREATE TABLE IF NOT EXISTS ledger_entries (
-    id TEXT PRIMARY KEY,
-    pool_id TEXT NOT NULL REFERENCES pools(id),
-    member_id TEXT REFERENCES pool_members(id),
-    purchase_id TEXT REFERENCES purchases(id),
-    kind TEXT NOT NULL CHECK (kind IN ('authorize', 'reserve', 'release', 'capture', 'refund', 'void')),
-    amount_cents INTEGER NOT NULL CHECK (amount_cents >= 0),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-  )`,
-  `CREATE TABLE IF NOT EXISTS usage_counters (
-    kind TEXT NOT NULL,
-    period TEXT NOT NULL,
-    count INTEGER NOT NULL DEFAULT 0,
-    PRIMARY KEY (kind, period)
-  )`,
-];
+import { sql } from "drizzle-orm";
+import {
+  boolean,
+  check,
+  foreignKey,
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  primaryKey,
+  text,
+  timestamp,
+  unique,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
+
+const timestamptz = (name: string) => timestamp(name, { withTimezone: true });
+
+export const households = pgTable("households", {
+  id: text("id").primaryKey(),
+  createdAt: timestamptz("created_at").notNull().defaultNow(),
+});
+
+export const users = pgTable(
+  "users",
+  {
+    id: text("id").primaryKey(),
+    householdId: text("household_id").notNull(),
+    name: text("name").notNull(),
+    role: text("role").notNull(),
+  },
+  (t) => [
+    foreignKey({ name: "users_household_id_fkey", columns: [t.householdId], foreignColumns: [households.id] }),
+    check("users_role_check", sql`${t.role} IN ('owner', 'member')`),
+  ],
+);
+
+export const pools = pgTable(
+  "pools",
+  {
+    id: text("id").primaryKey(),
+    householdId: text("household_id").notNull(),
+    ownerUserId: text("owner_user_id").notNull(),
+    goal: text("goal").notNull(),
+    status: text("status").notNull(),
+    termDays: integer("term_days").notNull(),
+    endsAt: timestamptz("ends_at").notNull(),
+    rail: text("rail").notNull(),
+    requestedCents: integer("requested_cents").notNull(),
+    authorizedCents: integer("authorized_cents").notNull().default(0),
+    reservedCents: integer("reserved_cents").notNull().default(0),
+    capturedCents: integer("captured_cents").notNull().default(0),
+    refundedCents: integer("refunded_cents").notNull().default(0),
+    releasedCents: integer("released_cents").notNull().default(0),
+    paypalOrderId: text("paypal_order_id"),
+    /** The current PayPal authorization. Its history is in `authorizations`. */
+    authorizationId: text("authorization_id"),
+    holdExpiresAt: timestamptz("hold_expires_at"),
+    note: text("note"),
+    createdAt: timestamptz("created_at").notNull().defaultNow(),
+    closedAt: timestamptz("closed_at"),
+  },
+  (t) => [
+    foreignKey({ name: "pools_household_id_fkey", columns: [t.householdId], foreignColumns: [households.id] }),
+    foreignKey({ name: "pools_owner_user_id_fkey", columns: [t.ownerUserId], foreignColumns: [users.id] }),
+    unique("pools_paypal_order_id_key").on(t.paypalOrderId),
+    check(
+      "pools_status_check",
+      sql`${t.status} IN ('draft', 'awaiting_payer', 'active', 'closing', 'closed', 'abandoned')`,
+    ),
+    check("pools_term_days_check", sql`${t.termDays} BETWEEN 1 AND 28`),
+    check("pools_requested_cents_check", sql`${t.requestedCents} > 0`),
+    check("pools_authorized_cents_check", sql`${t.authorizedCents} >= 0`),
+    check("pools_reserved_cents_check", sql`${t.reservedCents} >= 0`),
+    check("pools_captured_cents_check", sql`${t.capturedCents} >= 0`),
+    check("pools_refunded_cents_check", sql`${t.refundedCents} >= 0`),
+    check("pools_released_cents_check", sql`${t.releasedCents} >= 0`),
+    check(
+      "pools_never_overspent",
+      sql`${t.reservedCents} + ${t.capturedCents} + ${t.releasedCents} <= ${t.authorizedCents}`,
+    ),
+    check("pools_refund_within_captured", sql`${t.refundedCents} <= ${t.capturedCents}`),
+  ],
+);
+
+export const poolMembers = pgTable(
+  "pool_members",
+  {
+    id: text("id").primaryKey(),
+    poolId: text("pool_id").notNull(),
+    kind: text("kind").notNull(),
+    userId: text("user_id"),
+    label: text("label").notNull(),
+    active: boolean("active").notNull().default(true),
+    limitCents: integer("limit_cents").notNull(),
+    approvalThresholdCents: integer("approval_threshold_cents").notNull(),
+    reservedCents: integer("reserved_cents").notNull().default(0),
+    capturedCents: integer("captured_cents").notNull().default(0),
+    position: integer("position").notNull().default(0),
+    /** Refunded money stays used against the limit (architecture 7.3). */
+    refundedCents: integer("refunded_cents").notNull().default(0),
+  },
+  (t) => [
+    foreignKey({ name: "pool_members_pool_id_fkey", columns: [t.poolId], foreignColumns: [pools.id] }),
+    foreignKey({ name: "pool_members_user_id_fkey", columns: [t.userId], foreignColumns: [users.id] }),
+    check("pool_members_kind_check", sql`${t.kind} IN ('person', 'agent')`),
+    check("pool_members_limit_cents_check", sql`${t.limitCents} >= 0`),
+    check("pool_members_approval_threshold_cents_check", sql`${t.approvalThresholdCents} >= 0`),
+    check("pool_members_reserved_cents_check", sql`${t.reservedCents} >= 0`),
+    check("pool_members_captured_cents_check", sql`${t.capturedCents} >= 0`),
+    check("members_never_over_limit", sql`${t.reservedCents} + ${t.capturedCents} <= ${t.limitCents}`),
+    check("pool_members_refunded_cents_check", sql`${t.refundedCents} >= 0`),
+    check("members_refund_within_captured", sql`${t.refundedCents} <= ${t.capturedCents}`),
+  ],
+);
+
+/** Kitty's marketplace stores. Seeded by migration from `STORES` in `src/domain/stores.ts`. */
+export const stores = pgTable(
+  "stores",
+  {
+    name: text("name").primaryKey(),
+    position: integer("position").notNull(),
+  },
+  (t) => [unique("stores_position_key").on(t.position)],
+);
+
+/** The stores a member may buy from, in the order the owner chose them. */
+export const memberStores = pgTable(
+  "member_stores",
+  {
+    memberId: text("member_id").notNull(),
+    storeName: text("store_name").notNull(),
+    position: integer("position").notNull().default(0),
+  },
+  (t) => [
+    primaryKey({ name: "member_stores_pkey", columns: [t.memberId, t.storeName] }),
+    foreignKey({ name: "member_stores_member_id_fkey", columns: [t.memberId], foreignColumns: [poolMembers.id] }),
+    foreignKey({ name: "member_stores_store_name_fkey", columns: [t.storeName], foreignColumns: [stores.name] }),
+  ],
+);
+
+/** Every PayPal authorization a pool has held, linked through reauthorizations (architecture 5.5). */
+export const authorizations = pgTable(
+  "authorizations",
+  {
+    id: text("id").primaryKey(),
+    poolId: text("pool_id").notNull(),
+    previousAuthorizationId: text("previous_authorization_id"),
+    paypalAuthorizationId: text("paypal_authorization_id").notNull(),
+    amountCents: integer("amount_cents").notNull(),
+    honorEndsAt: timestamptz("honor_ends_at").notNull(),
+    expiresAt: timestamptz("expires_at").notNull(),
+    status: text("status").notNull(),
+    createdAt: timestamptz("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    foreignKey({ name: "authorizations_pool_id_fkey", columns: [t.poolId], foreignColumns: [pools.id] }),
+    foreignKey({
+      name: "authorizations_previous_authorization_id_fkey",
+      columns: [t.previousAuthorizationId],
+      foreignColumns: [t.id],
+    }),
+    unique("authorizations_paypal_authorization_id_key").on(t.paypalAuthorizationId),
+    check("authorizations_amount_cents_check", sql`${t.amountCents} >= 0`),
+    check("authorizations_status_check", sql`${t.status} IN ('active', 'replaced', 'voided', 'expired')`),
+    index("authorizations_by_pool").on(t.poolId, t.createdAt),
+  ],
+);
+
+export const products = pgTable(
+  "products",
+  {
+    id: text("id").primaryKey(),
+    source: text("source").notNull(),
+    externalId: text("external_id").notNull(),
+    store: text("store").notNull(),
+    title: text("title").notNull(),
+    description: text("description").notNull().default(""),
+    imageUrl: text("image_url"),
+    priceCents: integer("price_cents").notNull(),
+    fetchedAt: timestamptz("fetched_at").notNull().defaultNow(),
+  },
+  (t) => [
+    unique("products_source_external_id_key").on(t.source, t.externalId),
+    check("products_source_check", sql`${t.source} IN ('seed', 'channel3')`),
+    check("products_price_cents_check", sql`${t.priceCents} > 0`),
+  ],
+);
+
+export const agentRuns = pgTable(
+  "agent_runs",
+  {
+    id: text("id").primaryKey(),
+    poolId: text("pool_id").notNull(),
+    memberId: text("member_id").notNull(),
+    task: text("task").notNull(),
+    status: text("status").notNull(),
+    steps: jsonb("steps").notNull().default(sql`'[]'::jsonb`),
+    summary: text("summary"),
+    error: text("error"),
+    createdAt: timestamptz("created_at").notNull().defaultNow(),
+    heartbeatAt: timestamptz("heartbeat_at").notNull().defaultNow(),
+    finishedAt: timestamptz("finished_at"),
+  },
+  (t) => [
+    foreignKey({ name: "agent_runs_pool_id_fkey", columns: [t.poolId], foreignColumns: [pools.id] }),
+    foreignKey({ name: "agent_runs_member_id_fkey", columns: [t.memberId], foreignColumns: [poolMembers.id] }),
+    check("agent_runs_status_check", sql`${t.status} IN ('running', 'finished', 'failed')`),
+    uniqueIndex("agent_runs_one_open_per_member").on(t.memberId).where(sql`status = 'running'`),
+  ],
+);
+
+export const purchases = pgTable(
+  "purchases",
+  {
+    id: text("id").primaryKey(),
+    poolId: text("pool_id").notNull(),
+    memberId: text("member_id").notNull(),
+    productId: text("product_id").notNull(),
+    productTitle: text("product_title").notNull(),
+    store: text("store").notNull(),
+    quantity: integer("quantity").notNull(),
+    amountCents: integer("amount_cents").notNull(),
+    status: text("status").notNull(),
+    ruleCode: text("rule_code"),
+    message: text("message"),
+    aiDecision: text("ai_decision"),
+    aiReason: text("ai_reason"),
+    approvalReason: text("approval_reason"),
+    authorizationId: text("authorization_id"),
+    captureId: text("capture_id"),
+    refundId: text("refund_id"),
+    idempotencyKey: text("idempotency_key").notNull(),
+    agentRunId: text("agent_run_id"),
+    createdAt: timestamptz("created_at").notNull().defaultNow(),
+    updatedAt: timestamptz("updated_at").notNull().defaultNow(),
+    /** Set when a PayPal event contradicts the ledger (S38). */
+    needsAttention: boolean("needs_attention").notNull().default(false),
+    /** When a waiting approval expires (S41a). */
+    approvalExpiresAt: timestamptz("approval_expires_at"),
+    /** The owner who approved or denied it. */
+    decidedBy: text("decided_by"),
+  },
+  (t) => [
+    foreignKey({ name: "purchases_pool_id_fkey", columns: [t.poolId], foreignColumns: [pools.id] }),
+    foreignKey({ name: "purchases_decided_by_fkey", columns: [t.decidedBy], foreignColumns: [users.id] }),
+    foreignKey({ name: "purchases_member_id_fkey", columns: [t.memberId], foreignColumns: [poolMembers.id] }),
+    foreignKey({ name: "purchases_agent_run_id_fkey", columns: [t.agentRunId], foreignColumns: [agentRuns.id] }),
+    unique("purchases_idempotency_key_key").on(t.idempotencyKey),
+    check("purchases_quantity_check", sql`${t.quantity} BETWEEN 1 AND 20`),
+    check("purchases_amount_cents_check", sql`${t.amountCents} > 0`),
+    check(
+      "purchases_status_check",
+      sql`${t.status} IN ('rejected_by_rules', 'reviewing', 'blocked_by_ai', 'awaiting_approval', 'denied', 'expired', 'capturing', 'captured', 'capture_failed', 'capture_unknown', 'refund_pending', 'refunded')`,
+    ),
+    index("purchases_by_pool").on(t.poolId, t.createdAt),
+  ],
+);
+
+export const ledgerEntries = pgTable(
+  "ledger_entries",
+  {
+    id: text("id").primaryKey(),
+    poolId: text("pool_id").notNull(),
+    memberId: text("member_id"),
+    purchaseId: text("purchase_id"),
+    kind: text("kind").notNull(),
+    amountCents: integer("amount_cents").notNull(),
+    createdAt: timestamptz("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    foreignKey({ name: "ledger_entries_pool_id_fkey", columns: [t.poolId], foreignColumns: [pools.id] }),
+    foreignKey({ name: "ledger_entries_member_id_fkey", columns: [t.memberId], foreignColumns: [poolMembers.id] }),
+    foreignKey({ name: "ledger_entries_purchase_id_fkey", columns: [t.purchaseId], foreignColumns: [purchases.id] }),
+    check(
+      "ledger_entries_kind_check",
+      sql`${t.kind} IN ('authorize', 'reserve', 'release', 'capture', 'refund', 'void')`,
+    ),
+    check("ledger_entries_amount_cents_check", sql`${t.amountCents} >= 0`),
+  ],
+);
+
+export const usageCounters = pgTable(
+  "usage_counters",
+  {
+    kind: text("kind").notNull(),
+    period: text("period").notNull(),
+    count: integer("count").notNull().default(0),
+  },
+  (t) => [primaryKey({ name: "usage_counters_pkey", columns: [t.kind, t.period] })],
+);

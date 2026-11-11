@@ -6,6 +6,7 @@
  * transaction is ever held open across an AI or PayPal call.
  */
 import type { Database, PaymentRail, Queryable, RailResult, Reviewer } from "./ports";
+import { SELECT_MEMBERS } from "./stores";
 import { checkHardRules, finalOutcome } from "./rules";
 import {
   DomainError,
@@ -141,15 +142,15 @@ export async function approvePurchase(deps: PurchaseDeps, input: { purchaseId: s
   if (purchase.status !== "awaiting_approval") {
     throw new DomainError("conflict", "This purchase is no longer waiting for approval.");
   }
-  return reserveAndCapture(deps, purchase.id, "awaiting_approval");
+  return reserveAndCapture(deps, purchase.id, "awaiting_approval", input.userId);
 }
 
 export async function denyPurchase(deps: PurchaseDeps, input: { purchaseId: string; userId: string }) {
   const purchase = await loadOwnedPurchase(deps.db, input.purchaseId, input.userId);
   const [denied] = await deps.db.query<PurchaseRow>(
-    `UPDATE purchases SET status = 'denied', message = 'Denied by the owner.', updated_at = now()
+    `UPDATE purchases SET status = 'denied', message = 'Denied by the owner.', decided_by = $2, updated_at = now()
      WHERE id = $1 AND status = 'awaiting_approval' RETURNING *`,
-    [purchase.id],
+    [purchase.id, input.userId],
   );
   if (!denied) throw new DomainError("conflict", "This purchase is no longer waiting for approval.");
   return denied;
@@ -234,6 +235,8 @@ async function reserveAndCapture(
   deps: PurchaseDeps,
   purchaseId: string,
   from: "reviewing" | "awaiting_approval",
+  /** The owner who approved it, when `from` is `awaiting_approval`. */
+  decidedBy: string | null = null,
 ): Promise<PurchaseRow> {
   const { db, rail } = deps;
   const now = deps.now ?? (() => new Date());
@@ -255,9 +258,10 @@ async function reserveAndCapture(
     });
     if (!check.ok) {
       const [rejected] = await tx.query<PurchaseRow>(
-        `UPDATE purchases SET status = 'rejected_by_rules', rule_code = $2, message = $3, updated_at = now()
+        `UPDATE purchases SET status = 'rejected_by_rules', rule_code = $2, message = $3,
+           decided_by = COALESCE($4, decided_by), updated_at = now()
          WHERE id = $1 RETURNING *`,
-        [purchase.id, check.code, check.message],
+        [purchase.id, check.code, check.message, decidedBy],
       );
       return { purchase: rejected, capture: false as const };
     }
@@ -273,8 +277,10 @@ async function reserveAndCapture(
     ]);
     await addLedgerEntry(tx, purchase, "reserve");
     const [capturing] = await tx.query<PurchaseRow>(
-      "UPDATE purchases SET status = 'capturing', authorization_id = $2, updated_at = now() WHERE id = $1 RETURNING *",
-      [purchase.id, pool.authorization_id],
+      `UPDATE purchases SET status = 'capturing', authorization_id = $2, decided_by = COALESCE($3, decided_by),
+         updated_at = now()
+       WHERE id = $1 RETURNING *`,
+      [purchase.id, pool.authorization_id, decidedBy],
     );
     return { purchase: capturing, capture: true as const };
   });
@@ -380,7 +386,7 @@ async function lockPool(tx: Queryable, poolId: string): Promise<PoolRow> {
 async function lockPoolAndMember(tx: Queryable, poolId: string, memberId: string) {
   const pool = await lockPool(tx, poolId);
   // Member counters change only under the pool lock, so one lock is enough.
-  const [member] = await tx.query<MemberRow>("SELECT * FROM pool_members WHERE id = $1 AND pool_id = $2", [
+  const [member] = await tx.query<MemberRow>(`${SELECT_MEMBERS} WHERE id = $1 AND pool_id = $2`, [
     memberId,
     poolId,
   ]);
