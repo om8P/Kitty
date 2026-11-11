@@ -11,5 +11,8 @@ export default defineConfig({
     environment: "node",
     include: ["src/**/*.test.ts", "tests/**/*.test.ts"],
     exclude: ["node_modules", ".next"],
+    // Database tests run on the Docker Postgres (docker compose up -d db).
+    globalSetup: ["./tests/setup/database.ts"],
+    testTimeout: 15_000,
   },
 });

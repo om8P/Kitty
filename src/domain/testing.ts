@@ -1,5 +1,5 @@
-/** Test helpers: an in-memory Postgres, a scriptable payment rail and reviewer, and a ready-made pool. */
-import { openTestDatabase } from "@/db/client";
+/** Test helpers: a fresh schema on the test Postgres, a scriptable payment rail and reviewer, and a ready-made pool. */
+import { openTestDatabase, type TestDatabaseOptions } from "@/db/testing";
 import { confirmPool, createDemoHousehold, createPool, type NewMember } from "./pools";
 import type { Database, PaymentRail, RailResult, ReviewFacts, ReviewResult, Reviewer } from "./ports";
 import type { PurchaseDeps } from "./purchases";
@@ -82,9 +82,13 @@ export type World = {
 
 /** An active $150 grocery pool: a teen ($40 limit, approval above $15) and an agent ($80 limit, approval above $25). */
 export async function createWorld(
-  options: { amountCents?: number; members?: Partial<Record<"teen" | "agent", Partial<NewMember>>> } = {},
+  options: {
+    amountCents?: number;
+    members?: Partial<Record<"teen" | "agent", Partial<NewMember>>>;
+    database?: TestDatabaseOptions;
+  } = {},
 ): Promise<World> {
-  const db = await openTestDatabase();
+  const db = await openTestDatabase(options.database);
   const rail = createFakeRail();
   const reviewer = createFakeReviewer();
   const household = await createDemoHousehold(db);
