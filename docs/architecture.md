@@ -34,7 +34,7 @@ Kitty is one Next.js app on a long-running Node host (Render's free plan, kept a
 | Access | Signed httpOnly cookie, demo personas, shared access code | Proportionate to a sandbox product | A hosted identity provider |
 | Tests | Vitest on real Postgres, plus scripted sandbox scenarios | Race tests mean nothing against a mock | Mocking the database |
 
-**AI settings.** Review and agent calls stay separate, because Groq does not support structured output and tool use together. Review uses strict JSON-schema output. Groq's pages don't confirm strict schemas on tool calls, so Zod checks every tool argument. Keep prompts short and trim product text to fit the 8,000 tokens-a-minute limit.
+**AI settings.** Review and agent calls stay separate, because Groq rejects structured output and tool use in one call (confirmed in S10). Review uses strict JSON-schema output at the default `reasoning_effort`, because `low` let a manipulated product through in S10. Agent turns use `low`. Groq accepts `strict: true` on tools, but S10 couldn't show it is enforced, so Zod checks every tool argument. The SDK runs with `maxRetries: 0`, and the model seam paces from Groq's rate-limit headers. Keep prompts short and trim product text to fit the 8,000 tokens-a-minute limit. Details are in `docs/spike/S10.md`.
 
 ### 2.1 Free plans and their limits
 
@@ -45,7 +45,7 @@ Read from each provider's site in November 2026. Free plans change, so recheck t
 | Render free web service | 0.1 CPU, 512 MB, 750 instance hours a month per workspace, spins down after 15 idle minutes (about a minute to wake), may restart at any time. No card needed | Hours run out: free services are suspended until next month. Bandwidth over the free amount with no card: free services are suspended | Build minutes included each month, which the docs don't state. Results in `docs/spike/S12.md` |
 | Supabase free | 2 active projects, 500 MB database. Pauses after 7 days of low activity | Pausing stops the database until it is restored from the dashboard | That no card is needed, and that the 5-minute calls prevent pausing. Results in `docs/spike/S12.md` |
 | GitHub Actions on a public repo | Free minutes. Schedules every 5 minutes at most, from the default branch only | Runs can be delayed or skipped under load. Schedules stop after 60 days with no repo activity | None |
-| Groq, `openai/gpt-oss-120b` | 30 requests a minute, 1,000 a day, 8,000 tokens a minute, 200,000 tokens a day | Reviews go to owner approval and agent runs stop | That this table is the free plan, which comes from third-party lists. No card was needed at sign-up (owner, 2026-11-10) |
+| Groq, `openai/gpt-oss-120b` | 30 requests a minute, 1,000 a day, 8,000 tokens a minute, 200,000 tokens a day | Reviews go to owner approval and agent runs stop | None. The response headers confirmed 1,000 requests a day and 8,000 tokens a minute (S10), and the owner read the rest from the Groq console (2026-11-11). No card was needed at sign-up (owner, 2026-11-10) |
 | Channel3 | 1,000 free credits a month with no card, then $0.007 a credit. A search is 1 credit and product detail is free. With no card, running out returns `402` rather than billing (`docs/spike/S11.md`) | Kitty stops at 900 a month and switches to the seeded catalog | Whether the month resets on the calendar month or the signup date |
 | PayPal sandbox, AG Grid Community, public GitHub repo | Free | No known limit that affects Kitty | None. AG Grid features were confirmed in S09 (Q9) |
 

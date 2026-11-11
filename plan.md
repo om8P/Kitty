@@ -89,7 +89,7 @@ Database tests need `docker compose up -d db` first. From step M2 on, the race t
 | S08 | **Gate:** record the feasibility decision | Agent + You | S05 | done | D | N1 |
 | S08a | Spike the token fallback (only if S08 chose it) | Agent + You | S08 | skipped | D | N1 |
 | S09 | Check AG Grid and Drizzle row locks | Agent | S03 | done | |  |
-| S10 | Trial Groq tool calls and strict output | Agent + You | S02, S03 | pending | D | N2 |
+| S10 | Trial Groq tool calls and strict output | Agent + You | S02, S03 | done | D | N2 |
 | S11 | Sample Channel3 and ask about its terms | Agent + You | S02, S03 | done | |  |
 | S11a | Record Channel3's answer | You | S11 | pending | D | N3 |
 | S12 | Test deploy on Render and Supabase | Agent + You | S02, S03 | done | |  |

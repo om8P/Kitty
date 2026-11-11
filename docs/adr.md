@@ -225,6 +225,7 @@ We use Groq's free plan with `openai/gpt-oss-120b` for both jobs, through `groq-
 
 #### Risks
 - The model's quality and resistance to manipulated text are untested. The labeled test set decides. If quota runs out, reviews go to owner approval and agent runs stop.
+- S10 (2026-11-10) confirmed tool calling, strict JSON-schema output and the 1,000-a-day and 8,000-a-minute limits, and that tools and a schema can't share a call. The owner confirmed the other two free limits in the Groq console (2026-11-11). At `reasoning_effort: low` the reviewer allowed a product whose text told it to, while the default effort flagged it, so review runs at the default effort. See `docs/spike/S10.md`.
 
 ---
 
