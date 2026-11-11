@@ -5,7 +5,7 @@ import { PersonaSwitcher } from "./PersonaSwitcher";
 type Props = {
   session: Session | null;
   active?: "pools" | "shop";
-  payments?: "paypal" | "simulated";
+  payments?: "paypal" | "unconfigured" | "test";
   narrow?: boolean;
   children: React.ReactNode;
 };
@@ -39,7 +39,7 @@ export function Shell({ session, active, payments, narrow = false, children }: P
           )}
           <div className="header-tools">
             <span className="badge badge--outline badge--plain" title="No real money moves in this demo">
-              {payments === "simulated" ? "Simulated payments" : "PayPal sandbox"}
+              {payments === "paypal" || payments === undefined ? "PayPal sandbox" : "Sandbox · PayPal isn't set up"}
             </span>
             {session && <PersonaSwitcher people={session.users} currentId={session.user.id} />}
           </div>

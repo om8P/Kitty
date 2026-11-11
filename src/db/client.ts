@@ -1,15 +1,16 @@
+import type { Pool } from "pg";
 import type { Database, Queryable } from "@/domain/ports";
 import { pgConfig } from "./connection";
 import { SCHEMA_STATEMENTS } from "./schema";
 
 /**
- * One database handle per process.
- *
- * With DATABASE_URL set it is a `pg` pool (Supabase when hosted, Docker
- * locally). With no DATABASE_URL it is PGlite, a real Postgres compiled to
- * WebAssembly that stores its files in `.data/`, so the app runs after
- * `npm install` with nothing else to set up.
+ * One database handle per process: a `pg` pool on DATABASE_URL (Supabase when
+ * hosted, the Docker database locally). There is no fallback, so the app
+ * never keeps data outside the configured Postgres.
  */
+
+export const MISSING_DATABASE_MESSAGE =
+  "DATABASE_URL is not set. For local work run `docker compose up -d db` and set DATABASE_URL in .env (see .env.example).";
 
 type Store = { database?: Promise<Database> };
 const store = globalThis as typeof globalThis & { __kittyDb?: Store };
@@ -24,19 +25,26 @@ export function getDatabase(): Promise<Database> {
   return store.__kittyDb.database;
 }
 
-async function open(): Promise<Database> {
-  const config = pgConfig();
-  const database = config ? await openPg(config) : await openPglite(process.env.KITTY_DATA_DIR ?? ".data/pglite");
-  for (const statement of SCHEMA_STATEMENTS) await database.query(statement);
-  return database;
+/** Throws with a clear message when DATABASE_URL is missing. Called at startup. */
+export function requireDatabaseConfig(env: Record<string, string | undefined> = process.env) {
+  const config = pgConfig(env);
+  if (!config) throw new Error(MISSING_DATABASE_MESSAGE);
+  return config;
 }
 
-async function openPg(config: NonNullable<ReturnType<typeof pgConfig>>): Promise<Database> {
+async function open(): Promise<Database> {
+  const config = requireDatabaseConfig();
   const { Pool } = await import("pg");
   const pool = new Pool({ ...config, max: 5, connectionTimeoutMillis: 10_000 });
   // An idle client that errors must not crash the process.
   pool.on("error", () => undefined);
+  const database = wrapPool(pool);
+  for (const statement of SCHEMA_STATEMENTS) await database.query(statement);
+  return database;
+}
 
+/** Adapts a `pg` pool to the domain's Database port. Each transaction uses one client. */
+export function wrapPool(pool: Pool): Database {
   return {
     async query<T>(sql: string, params: unknown[] = []) {
       const result = await pool.query(sql, params);
@@ -62,39 +70,4 @@ async function openPg(config: NonNullable<ReturnType<typeof pgConfig>>): Promise
       }
     },
   };
-}
-
-/** `dataDir` undefined keeps everything in memory, which the tests use. */
-export async function openPglite(dataDir?: string): Promise<Database> {
-  const { PGlite } = await import("@electric-sql/pglite");
-  if (dataDir) {
-    const { mkdirSync } = await import("node:fs");
-    mkdirSync(dataDir, { recursive: true });
-  }
-  const pglite = new PGlite(dataDir);
-  await pglite.waitReady;
-
-  return {
-    async query<T>(sql: string, params: unknown[] = []) {
-      const result = await pglite.query(sql, params);
-      return result.rows as T[];
-    },
-    transaction<T>(fn: (tx: Queryable) => Promise<T>) {
-      return pglite.transaction((tx) =>
-        fn({
-          async query<R>(sql: string, params: unknown[] = []) {
-            const result = await tx.query(sql, params);
-            return result.rows as R[];
-          },
-        }),
-      ) as Promise<T>;
-    },
-  };
-}
-
-/** A fresh in-memory database with the schema applied, for tests. */
-export async function openTestDatabase(): Promise<Database> {
-  const database = await openPglite();
-  for (const statement of SCHEMA_STATEMENTS) await database.query(statement);
-  return database;
 }

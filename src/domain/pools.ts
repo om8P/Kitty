@@ -51,6 +51,9 @@ export async function createPool(
   const { db, rail } = deps;
   const now = (deps.now ?? (() => new Date()))();
   validateNewPool(input);
+  if (rail.name === "unconfigured") {
+    throw new DomainError("conflict", "PayPal isn't set up, so no pool was created. Nothing was held.");
+  }
 
   const poolId = newId();
   const endsAt = new Date(now.getTime() + input.termDays * 86_400_000);

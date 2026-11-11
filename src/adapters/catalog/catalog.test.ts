@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { openTestDatabase } from "@/db/client";
+import { openTestDatabase } from "@/db/testing";
 import { cleanQuery, createCatalog, mapChannel3Product, storeForCategory } from "./catalog";
 import { SEED_PRODUCTS, searchSeed } from "./seed";
 

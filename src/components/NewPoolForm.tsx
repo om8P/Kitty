@@ -23,7 +23,7 @@ const TERMS = [
 ];
 
 /** Create a pool: the goal and amount, then each spender's limit, approval amount and stores. */
-export function NewPoolForm({ teenName, simulated }: { teenName: string; simulated: boolean }) {
+export function NewPoolForm({ teenName, paypalReady }: { teenName: string; paypalReady: boolean }) {
   const id = useId();
   const formRef = useRef<HTMLFormElement>(null);
   const [goal, setGoal] = useState("Weekly groceries");
@@ -224,12 +224,12 @@ export function NewPoolForm({ teenName, simulated }: { teenName: string; simulat
         <div className="row">
           <button className="button" type="submit" aria-disabled={busy}>
             {busy && <span className="spinner" aria-hidden="true" />}
-            {simulated ? "Open the pool" : busy ? "Opening PayPal" : "Continue to PayPal"}
+            {busy ? "Opening PayPal" : "Continue to PayPal"}
           </button>
           <p className="muted small grow">
-            {simulated
-              ? "PayPal keys aren't set, so this pool uses simulated payments."
-              : "You approve once on PayPal's sandbox site. No real money moves."}
+            {paypalReady
+              ? "You approve once on PayPal's sandbox site. No real money moves."
+              : "PayPal isn't set up yet, so a pool can't be created. Add the sandbox keys to .env, then restart."}
           </p>
         </div>
       </div>

@@ -65,7 +65,7 @@ export type RunView = {
 };
 
 export type Capabilities = {
-  payments: "paypal" | "simulated";
+  payments: "paypal" | "unconfigured";
   ai: boolean;
   catalog: "channel3" | "seed";
 };

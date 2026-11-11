@@ -15,7 +15,7 @@ type Env = Record<string, string | undefined>;
 export function createRail(env: Env = process.env): PaymentRail {
   const clientId = env.PAYPAL_CLIENT_ID?.trim();
   const clientSecret = env.PAYPAL_CLIENT_SECRET?.trim();
-  if (!clientId || !clientSecret) return createSimulatedRail();
+  if (!clientId || !clientSecret) return createUnconfiguredRail();
   return createPayPalRail(
     createPayPalClient({ clientId, clientSecret, webhookId: env.PAYPAL_WEBHOOK_ID?.trim() ?? "" }),
   );
@@ -84,35 +84,22 @@ export function createPayPalRail(client: PayPalClient): PaymentRail {
   };
 }
 
+export const PAYPAL_NOT_SET_UP = "PayPal isn't set up. Add the sandbox keys to .env (see .env.example), then restart.";
+
 /**
- * Used only when no PayPal keys are set, so the app can be explored offline.
- * It makes no network calls and approves everything. Screens label it clearly.
+ * Used when no PayPal keys are set. It makes no network calls and every call
+ * fails, so no payment can be approved without PayPal (architecture 3).
  */
-export function createSimulatedRail(delayMs = 350): PaymentRail {
-  const pause = () => new Promise((resolve) => setTimeout(resolve, delayMs));
+export function createUnconfiguredRail(): PaymentRail {
+  const refuse = async () =>
+    ({ outcome: "unsupported", code: "PAYPAL_NOT_SET_UP", message: PAYPAL_NOT_SET_UP }) as const;
   return {
-    name: "simulated",
-    async createPoolPayment({ poolId, returnUrl }) {
-      const orderId = `SIM-ORDER-${poolId}`;
-      const url = new URL(returnUrl);
-      url.searchParams.set("token", orderId);
-      return { outcome: "succeeded", data: { orderId, approvalUrl: url.toString() } };
-    },
-    async confirmPoolPayment({ poolId }) {
-      return { outcome: "succeeded", data: { authorizationId: `SIM-AUTH-${poolId}`, authorizedCents: null, expiresAt: null } };
-    },
-    async charge({ purchaseId }) {
-      await pause();
-      return { outcome: "succeeded", data: { captureId: `SIM-CAP-${purchaseId}` } };
-    },
-    async refund({ purchaseId }) {
-      await pause();
-      return { outcome: "succeeded", data: { refundId: `SIM-REF-${purchaseId}` } };
-    },
-    async releaseHold() {
-      await pause();
-      return { outcome: "succeeded", data: {} };
-    },
+    name: "unconfigured",
+    createPoolPayment: refuse,
+    confirmPoolPayment: refuse,
+    charge: refuse,
+    refund: refuse,
+    releaseHold: refuse,
   };
 }
 

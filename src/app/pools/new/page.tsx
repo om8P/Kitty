@@ -34,7 +34,7 @@ export default async function NewPoolPage({ searchParams }: { searchParams: Prom
             </span>
           </div>
         )}
-        <NewPoolForm teenName={teen?.name ?? "Family member"} simulated={rail.name === "simulated"} />
+        <NewPoolForm teenName={teen?.name ?? "Family member"} paypalReady={rail.name === "paypal"} />
       </div>
     </Shell>
   );

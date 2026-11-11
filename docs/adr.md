@@ -1,6 +1,6 @@
 # Kitty Architecture Decision Records
 
-Key decisions behind `docs/architecture.md`. All are `proposed` because nothing has been built and the PayPal behavior is untested.
+Key decisions behind `docs/architecture.md`. Most are still `proposed`. ADR-0002 and ADR-0006 are `accepted`, and ADR-0003 has a recorded S08 note.
 
 | ADR | Title | Status | Date |
 |---|---|---|---|
@@ -9,8 +9,10 @@ Key decisions behind `docs/architecture.md`. All are `proposed` because nothing 
 | 0003 | Kitty's ledger is the spending authority | proposed | 2026-11-10 |
 | 0004 | Hard rules run in code first, and AI can only tighten | proposed | 2026-11-10 |
 | 0005 | Use Groq's free plan behind a model seam | proposed | 2026-11-10 |
-| 0006 | Build pools on PayPal authorization and partial capture | proposed, depends on the Milestone 1 sandbox spike | 2026-11-10 |
+| 0006 | Build pools on PayPal authorization and partial capture | accepted (S08, 2026-11-11) | 2026-11-10 |
 | 0007 | Keep Channel3 behind a catalog seam with minimal storage | proposed | 2026-11-10 |
+| 0008 | Product direction: continue, both user groups equal, honest hold wording, adversarial demo | accepted | 2026-11-11 |
+| 0009 | Match the model and catalog seams, and the ledger's entry kinds, to the built code | accepted | 2026-11-11 |
 
 ---
 
@@ -141,6 +143,9 @@ Every movement of funds happens in a short Postgres transaction that locks the p
 #### Risks
 - PayPal's replay behavior and refund capacity are untested. Questions Q5 and Q6 cover them, and a ledger mismatch pauses the pool.
 
+#### S08 note (2026-11-11)
+The owner confirmed authorize-and-capture as the payment path, based on `docs/spike/S05.md`. One sandbox authorization took 30 partial captures with no PayPal approval step. Replaying a capture with the same `PayPal-Request-Id` returned the original capture and moved no money, within at least one hour. The spike also found that a replay response echoes the replayed request's amount, so the ledger settles a capture from the purchase's own amount and the returned capture ID, never from the response amount (arch 7.2). Refund capacity (Q6) is still open and is checked in S06a.
+
 ---
 
 ## ADR-0004: Hard rules run in code first, and AI can only tighten
@@ -225,12 +230,12 @@ We use Groq's free plan with `openai/gpt-oss-120b` for both jobs, through `groq-
 ## ADR-0006: Build pools on PayPal authorization and partial capture
 
 **Date**: 2026-11-10
-**Status**: proposed (depends on the Milestone 1 sandbox spike)
+**Status**: accepted (S08, 2026-11-11)
 **Deciders**: Project owner, with Claude Code
 
 ### Context
 
-Kitty's core promise is one approval, then spending in pieces. PayPal fixes the payee when the order is created, so Kitty is the single merchant. Authorizations last 29 days, with funds firmly honored for 3. Multiple partial captures are untested on this sandbox account.
+Kitty's core promise is one approval, then spending in pieces. PayPal fixes the payee when the order is created, so Kitty is the single merchant. Authorizations last 29 days, with funds firmly honored for 3. Multiple partial captures were untested on this sandbox account when this ADR was written. S05 later confirmed them.
 
 ### Decision
 
@@ -259,6 +264,9 @@ Each pool is one PayPal order with `intent: AUTHORIZE`, and each purchase is a p
 
 #### Risks
 - If neither partial captures nor the fallback work, Milestone 1 fails. Questions Q1 to Q4 cover this.
+
+#### S08 result (2026-11-11)
+Accepted. S05 answered Q1 (yes, with no PayPal approval step) and gave a lower bound for Q2 (30 captures on one authorization, with no cap hit). PayPal's developer pages reviewed on 2026-11-11 state no maximum number of captures, only an amount cap and the 29-day window, so Q2 stays a lower bound. Q3 uses its stated fallback while S06b waits for day 4 (`refreshHold` returns `unsupported` and the pool shows "hold needs refreshing"). Q4, Q6 and Q7 are checked against the built code in S06a, S07 and M4. The Payment Method Tokens fallback (S08a) is skipped. Sandbox accounts must be able to transact in USD, so the README tells judges to use US sandbox accounts.
 
 ---
 
@@ -298,3 +306,82 @@ Channel3 `/v1/search` sits behind a catalog seam. Kitty stores only the products
 
 #### Risks
 - The terms may not allow this use at all. Question Q8 covers this, and `CATALOG_PROVIDER` can switch to the seeded catalog. S11 found that the 1,000 free credits renew monthly, and that Channel3's caching guide suggests a shorter retention than 24 hours (`docs/spike/S11.md`).
+
+---
+
+## ADR-0008: Product direction: continue, both user groups equal, honest hold wording, adversarial demo
+
+**Date**: 2026-11-11
+**Status**: accepted (S18)
+**Deciders**: Project owner, with Claude Code
+
+### Context
+
+The S18 gate asks whether to continue, which user group leads, and whether to make four product changes: position Kitty as a shopping service, make agents the lead audience, reword "reserved", and add an adversarial demo moment. There are no interviews, so this is the owner's decision on the research. `docs/research.md` finds the AI-agent problem better supported than the family one, finds that PayPal offers no reserved, shared budget, and finds at least four hackathon entries with limits or approvals, one aimed at households. PayPal firmly honors an authorization for only 3 of its 29 days (`docs/research.md` section 4, PayPal's two-step payments page).
+
+### Decision
+
+- **Continue** with the current direction: a household layer on PayPal, not a rival to it.
+- **Both user groups stay equal.** The shared story stays a parent delegating a grocery budget to an AI agent and a teen. Agents are not made the lead audience.
+- **Reword "reserved"** in user-facing text to say the money is held on the owner's PayPal, without promising a guaranteed reservation for the whole term. The ledger's internal names (`reserved_cents`) do not change.
+- **Add an adversarial demo moment.** A product listing tries to manipulate the AI agent or reviewer, and the hard rules still stop the purchase.
+- **No shopping-service framing,** and the word "pool" is kept.
+
+### Alternatives Considered
+
+#### Lead with AI-agent users
+- **Pros**: Stronger survey support, and it matches the "Best Use of Agentic Commerce" prize.
+- **Cons**: Weakens the shared family story that sets Kitty apart from agent-only products.
+- **Why not**: The owner chose to keep both groups equal.
+
+#### Position Kitty as a shopping service
+- **Pros**: Explains why spending happens only at Kitty's marketplace.
+- **Cons**: Moves the focus away from the PayPal hold and the shared rules.
+- **Why not**: The owner kept the spending-layer framing.
+
+### Consequences
+
+#### Positive
+- The pitch claims only what PayPal guarantees, which also fits judging on credibility.
+- The adversarial moment shows the hard rules working, which the four rival entries don't show.
+
+#### Negative
+- Without a lead group, the demo has to serve two audiences within 3 minutes.
+
+#### Risks
+- "Pool" still collides with PayPal Pools. Screens must keep Kitty's own name and the "Sandbox" label so no one mistakes Kitty for PayPal (`rules.md`).
+
+---
+
+## ADR-0009: Match the model and catalog seams, and the ledger's entry kinds, to the built code
+
+**Date**: 2026-11-11
+**Status**: accepted (M5)
+**Deciders**: Project owner, with Claude Code
+
+### Context
+
+M5 compared the MVP with `docs/architecture.md` (list in `docs/arch-reconciliation.md`). Three differences were on no known list. Arch 3 describes the model seam as two functions, `reviewPurchase` and `agentTurn`, chosen by `AI_PROVIDER`. The code has one `Model` interface, a single chat call with typed failures, and the reviewer and agent runner are built on top of it. Arch 3 gives the catalog seam `search` and `getProduct`. The code has `search` and `featured`, and the purchase service reads the product row by its local ID. The ledger also writes an `authorize` entry when a pool is approved, which arch 6 doesn't list.
+
+### Decision
+
+Amend the architecture to match the code. The model seam is one `Model` interface. The reviewer (`src/ai/reviewer.ts`) and agent runner (`src/ai/agent.ts`) sit on it, and `AI_PROVIDER` picks the adapter once a second one exists (E1). The catalog seam is `search` and `featured`, and a product is always read from `products` by its local ID. `ledger_entries.kind` includes `authorize`.
+
+### Alternatives Considered
+
+#### Reshape the code to the arch
+- **Pros**: No arch edit.
+- **Cons**: A rewrite of working, tested code before the deadline, for no change in behavior.
+- **Why not**: Every rule the seams protect (typed failures, no `allow` on failure, local IDs and prices) already holds.
+
+### Consequences
+
+#### Positive
+- S28 keeps the `Model` interface when it adopts `groq-sdk`, so the reviewer and agent don't change.
+
+#### Negative
+- A second provider (E1) has to fit the chat-shaped interface.
+
+#### Risks
+- None to money. The `authorize` entry records the approved amount and moves no counter.
+

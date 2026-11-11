@@ -6,7 +6,7 @@ import type { Session } from "./session";
 
 export function capabilitiesOf(container: Container): Capabilities {
   return {
-    payments: container.rail.name,
+    payments: container.rail.name === "paypal" ? "paypal" : "unconfigured",
     ai: container.model.configured,
     catalog: container.catalog.provider,
   };
