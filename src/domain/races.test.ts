@@ -120,13 +120,21 @@ describe("races on the pool lock", () => {
     let closing: Promise<unknown> | undefined;
     world.reviewer.review = async () => {
       // The purchase reserves and holds the lock. The close arrives during that hold.
-      closing = wait(HOLD_MS / 3).then(() => close(world));
+      // Capture its outcome at once, so its refusal is never an unhandled rejection.
+      closing = wait(HOLD_MS / 3)
+        .then(() => close(world))
+        .then(
+          () => null,
+          (error: unknown) => error,
+        );
       return allow;
     };
 
     const purchase = await buy(world, productId, "teen");
     // The close saw a payment still settling, so it refused and changed nothing.
-    await expect(closing).rejects.toThrow("A payment is still settling");
+    const refusal = await closing;
+    expect(refusal).toBeInstanceOf(DomainError);
+    expect((refusal as DomainError).message).toContain("A payment is still settling");
     expect(purchase.status).toBe("captured");
 
     const closed = await close(world);
