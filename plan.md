@@ -115,7 +115,7 @@ Database tests need `docker compose up -d db` first. From step M2 on, the race t
 | S27 | Channel3 adapter | Agent | S11a, S26 | in-progress | D | N4 |
 | S28 | Model seam and Groq adapter | Agent | S10, S19 | done | D | N2 |
 | S29 | AI purchase reviewer | Agent | S28 | done | |  |
-| S29a | Strict review schema | Agent | S10, S29 | pending | D | N2 |
+| S29a | Strict review schema | Agent | S10, S29 | done | D | N2 |
 | S30 | Purchase service: checks and review | Agent | S20, S21, S26, S29 | done | |  |
 | S31 | Purchase service: reserve and capture | Agent | S22, S30 | done | |  |
 | S32 | Member buying screens | Agent + You | S31 | in-progress | D | N3 |

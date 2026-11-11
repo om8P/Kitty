@@ -40,8 +40,6 @@ export type ChatRequest = {
   tools?: ToolDefinition[];
   /** Strict JSON-schema output. Groq can't combine it with tools. */
   jsonSchema?: { name: string; schema: Record<string, unknown> };
-  /** Any single JSON object as the reply (Groq's `json_object` mode). */
-  json?: boolean;
   maxTokens?: number;
   /** Leave unset for the model's default. Agent turns use `low`, reviews the default (S10). */
   reasoningEffort?: "low" | "medium" | "high";
@@ -144,8 +142,6 @@ export function createGroqModel(
         type: "json_schema",
         json_schema: { name: request.jsonSchema.name, schema: request.jsonSchema.schema, strict: true },
       };
-    } else if (request.json) {
-      params.response_format = { type: "json_object" };
     }
     if (request.reasoningEffort) params.reasoning_effort = request.reasoningEffort;
 

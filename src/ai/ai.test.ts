@@ -56,6 +56,43 @@ describe("reviewer", () => {
     expect(model.requests[0].tools).toBeUndefined();
   });
 
+  it("asks for strict JSON-schema output at the default reasoning effort", async () => {
+    const model = scriptedModel([answer('{"decision":"allow","reason":"Fits the goal."}')]);
+    await createReviewer(model).review(facts);
+
+    const request = model.requests[0];
+    expect(request.jsonSchema?.name).toBe("purchase_review");
+    expect(request.jsonSchema?.schema).toEqual({
+      type: "object",
+      properties: {
+        decision: { type: "string", enum: ["allow", "flag", "block"] },
+        reason: { type: "string", description: expect.any(String) },
+      },
+      required: ["decision", "reason"],
+      additionalProperties: false,
+    });
+    // `low` let a manipulated product through in S10, so the reviewer leaves the default.
+    expect(request.reasoningEffort).toBeUndefined();
+    expect(request.maxTokens).toBe(1024);
+  });
+
+  it("checks a schema answer with Zod even so", async () => {
+    const valid = await createReviewer(scriptedModel([answer('{"decision":"block","reason":"Not groceries."}')])).review(
+      facts,
+    );
+    expect(valid).toEqual({ decision: "block", reason: "Not groceries." });
+
+    for (const content of [
+      '{"decision":"allow","reason":"ok","extra":true}',
+      '{"decision":"allow","reason":""}',
+      '{"decision":"maybe","reason":"ok"}',
+      'Here you go: {"decision":"allow","reason":"ok"}',
+    ]) {
+      const result = await createReviewer(scriptedModel([answer(content)])).review(facts);
+      expect(result.decision, content).toBe("unavailable");
+    }
+  });
+
   it.each([
     ["a model failure", { ok: false, reason: "timeout" } as ChatResult],
     ["a rate limit", { ok: false, reason: "rate_limited" } as ChatResult],
