@@ -1,6 +1,6 @@
 # Kitty Build Plan (v2)
 
-This is the second version of the plan. The original is kept unchanged in `v1/plan.md`. Version 2 starts from the working MVP on branch `step/mvp-demo-flow` and finishes the build to the design in `docs/architecture.md`. Each step is sized for one chat. A fresh session can run any step using this file, `rules.md` and the documents the step names.
+This is the second version of the plan. The original is kept unchanged in `v1/plan.md`. Version 2 starts from the working MVP (built on `step/mvp-demo-flow`, merged to `main` in pull request 16) and finishes the build to the design in `docs/architecture.md`. Each step is sized for one chat. A fresh session can run any step using this file, `rules.md` and the documents the step names.
 
 - **Requirements:** `.claude/prds/kitty.prd.md`
 - **Design:** `docs/architecture.md` (referred to below as "arch")
@@ -34,7 +34,7 @@ Work runs in **sessions**, not single steps. A session bundles several steps tha
 **Starting a session.** The owner can start any session with one line, such as "read the md files and start the session". Follow "Starting a session" in `rules.md`: find the next session yourself (step 1 below), say which one it is in two lines, ask only the questions in that session's brief under "Session briefs", then run it. The owner does not need to name the session, its steps or its branch.
 
 1. Pick the first session in the Sessions tables whose "Starts when" condition is met and whose earlier sessions are merged to `main`. Do not start an `I` session before N8 is done, unless time is left before the deadline and the table allows it.
-2. Use the branch named in the session's brief (`session/<id>-<short-name>`, cut from `main`). One session per branch and pull request. N1 is the exception: it works on the existing MVP branch, `step/mvp-demo-flow`. A session that is already part-done keeps its branch: look for `session/<id>-*` before making a new one.
+2. Use the branch named in the session's brief (`session/<id>-<short-name>`, cut from `main`). One session per branch and pull request. A session that is already part-done keeps its branch: look for `session/<id>-*` before making a new one.
 3. Set the session's steps to `in-progress` as you reach them. Read each step's section and the arch sections it names.
 4. Do the steps in the listed order, and stay inside the session. Commit once per step, with the step ID in the message, so the history stays reviewable. If the session won't fit in one chat, split it at a step boundary (see Changing this plan).
 5. After each step, run its checks and the baseline checks. At the end, run the rules in "After every step".
@@ -201,7 +201,7 @@ What a session needs beyond its steps. Every session also follows `rules.md` ("S
 
 | Session | Branch | Ask first | Notes |
 |---|---|---|---|
-| **N1** | `step/mvp-demo-flow` (fetch it from `origin`) | 1. Confirm authorize-and-capture as the path (S08; evidence `docs/spike/S05.md`). 2. Which user group leads, and the four product changes (S18) | Merge the latest `main` in first; if `plan.md` conflicts, take `main`'s version. Record the S08 and S18 decisions in `docs/adr.md`. Database tests need `docker compose up -d db`. M5 writes the list of differences between the code and the arch |
+| **N1** | `session/N1-land-harden` (the MVP is already on `main`, pull request 16) | 1. Confirm authorize-and-capture as the path (S08; evidence `docs/spike/S05.md`). 2. Which user group leads, and the four product changes (S18) | Record the S08 and S18 decisions in `docs/adr.md`. Database tests need `docker compose up -d db`. M5 writes the list of differences between the code and the arch |
 | **N2** | `session/N2-architecture` | Your Groq free-plan limits, read from the Groq console (S10) | The existing tests must pass unchanged, and migrations must work from empty and from an MVP-made database. For S29a, ask before recording an ADR exception for strict schema. Stay inside the Groq free limits |
 | **N3** | `session/N3-sandbox-check` | Are you present now? You are needed for each sandbox approval, the tunnel and webhook, and Channel3's reply (S11a) | Ask for each approval as it is needed. Tell the owner when to put `PAYPAL_WEBHOOK_ID` in `.env`. Record results in `docs/test-results.md`, `docs/spike/S06a.md` and `docs/spike/S07.md`, with no secrets or account details. Fix any mismatch with the PayPal dashboard before closing the steps |
 | **N4** | `session/N4-finish-build` | Nothing | S22: only the remaining methods (`verifyWebhookSignature`, `getCapture`, `holdsRealFunds`). Money rules apply: no transaction spans a PayPal or AI call, and an unclear outcome never releases funds. Use synthetic fixtures only. S38 needs tests for duplicate, reordered, unmatched, contradictory and unsigned events. S41a uses `CRON_SECRET` and the schedule workflow calls the tick |
@@ -421,7 +421,7 @@ What a session needs beyond its steps. Every session also follows `rules.md` ("S
 
 ## Phase M: Adopt the MVP
 
-The MVP on `step/mvp-demo-flow` (two commits, based on `main` at 3657220) passes lint, typecheck and 413 tests. These steps bring it onto `main`, prove the claims its tests cannot, and remove the shortcuts that must not reach the submission.
+The MVP was built on `step/mvp-demo-flow` (two commits, based on `main` at 3657220) and passes lint, typecheck and 413 tests. Pull request 16 merged it to `main` on 2026-11-11. These steps prove the claims its tests cannot, and remove the shortcuts that must not reach the submission.
 
 ### M1: Land the MVP and sync this plan (Agent + You)
 
