@@ -4,12 +4,24 @@ Shared PayPal spending pools for families and AI agents. An owner approves one P
 
 ## Start here
 
-- **Work comes from `plan.md`.** Do one step per chat: the first `pending` step whose dependencies are `done`, unless the owner names another. Follow "How to run a step" in that file, and keep its status table current.
+- **Work comes from `plan.md`, in sessions.** Do one session per chat. Follow "Starting a session" below and "How to run a session" in that file, and keep its status table current.
 - **Requirements:** `.claude/prds/kitty.prd.md`
 - **Design:** `docs/architecture.md`
 - **Decisions:** `docs/adr.md`
 - **Research:** `docs/research.md`
 - `project.md` is the original plan and is out of date. It still says "Circle", Claude and Render. Use it only for the PayPal API map and webhook list.
+
+## Starting a session
+
+When the owner says something like "read the md files and start the session", do this without asking what to do:
+
+1. **Read.** `rules.md`, then `plan.md`: "How to run a session", the Status table, the Sessions tables, the Session briefs, and the sections of the steps in the session. Read the arch sections those steps name, and `docs/adr.md` where they touch a decision.
+2. **Check the repo.** Run `git fetch` and `git status`. Leave uncommitted work and other branches alone. If the working folder is dirty or on another branch, make a git worktree for the session (`git worktree add ../PayPal-<session id> -b <branch> origin/main`, or check out `origin/step/mvp-demo-flow` for N1) and work there.
+3. **Pick the session.** Unless the owner names one, take the first session in order N1 to N8, then I1 to I6, that still has a step not `done` or `skipped` and whose "Starts when" and dependencies are met. Trust `origin/main`, not just the status table, for what is merged. If a branch `session/<id>-*` already has commits, resume that session. If the next session can't start (for example I3 before its date), say why and offer the next one that can.
+4. **Say what you picked** in two lines: the session, its steps and its branch.
+5. **Ask the owner's questions** from the session's "Ask first" brief, together in one message. Don't ask anything the plan already answers.
+6. **Run the session** as "How to run a session" says, in the listed step order, using the model the Sessions table names.
+7. **Finish.** Update `plan.md` statuses, report what is done, blocked or left, then stop and ask the owner to approve the commit, push, pull request and merge.
 
 ## Stack
 
@@ -99,6 +111,6 @@ Status colors are Kitty's own: green for captured, amber for needs approval or a
 - Ask before changing the PRD. Record milestone progress in `plan.md`.
 - If a step changes a design decision, update `docs/architecture.md` and `docs/adr.md` in the same branch.
 - Unverified claims stay marked **[verify]** until checked. Record sanitized spike results in `docs/spike/<step-id>.md`.
-- Keep to the step in hand. Nice-to-have extras (Phase F) come last.
-- Branch from `main` as `step/<id>-<short-name>`. Finish the step on its branch, then stop and ask the owner to approve the commit, push, pull request and merge. A dependency counts only once it is merged to `main`.
+- Keep to the session in hand. Improvement sessions (I1 to I6) come after the necessary ones (N1 to N8).
+- Use the session's branch from `plan.md` (`session/<id>-<short-name>` cut from `main`; N1 uses `step/mvp-demo-flow`). Finish the session on its branch, then stop and ask the owner to approve the commit, push, pull request and merge. A dependency counts only once it is merged to `main`. Commit once per step, with the step ID in the message.
 - Commit messages must not include `Co-Authored-By: Claude` or any other Claude attribution.
