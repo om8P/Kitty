@@ -23,8 +23,12 @@ export type RailResult<T> =
   | { outcome: "unknown"; reason: string };
 
 export interface PaymentRail {
-  /** `simulated` means no PayPal keys are set and no real sandbox call is made. */
-  readonly name: "paypal" | "simulated";
+  /**
+   * `unconfigured` means no PayPal keys are set: every call fails and no pool
+   * can be created. `test` is the scripted rail in the test helpers, which the
+   * app never uses.
+   */
+  readonly name: "paypal" | "unconfigured" | "test";
   createPoolPayment(input: {
     poolId: string;
     amountCents: number;

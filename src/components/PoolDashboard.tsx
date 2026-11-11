@@ -176,7 +176,7 @@ export function PoolDashboard({ initial }: { initial: PoolStateView }) {
             <span className="balance__amount">{formatUsd(pool.availableCents)}</span>
             <span className="muted">
               available of {formatUsd(pool.authorizedCents)} held on{" "}
-              {capabilities.payments === "paypal" ? "PayPal (sandbox)" : "a simulated hold"} · ends{" "}
+              {capabilities.payments === "paypal" ? "PayPal (sandbox)" : "PayPal (not set up)"} · ends{" "}
               {formatDay(pool.endsAt)}
             </span>
           </div>

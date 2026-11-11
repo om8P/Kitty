@@ -16,7 +16,7 @@ export type FakeRail = PaymentRail & {
 
 export function createFakeRail(): FakeRail {
   const rail: FakeRail = {
-    name: "simulated",
+    name: "test",
     charges: [],
     refunds: [],
     releases: [],
