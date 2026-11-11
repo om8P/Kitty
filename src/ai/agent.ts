@@ -30,9 +30,15 @@ export type AgentDeps = {
   model: Model;
   catalog: Catalog;
   purchases: PurchaseDeps;
+  /** Milliseconds since the epoch. Tests control it. */
+  now?: () => number;
+  /** The wall-clock cap on one run (architecture 5.7). */
+  maxRunMs?: number;
 };
 
 const MAX_TURNS = 8;
+/** A run stops after this long. A stale run is also reclaimed after 3 minutes without a heartbeat. */
+export const MAX_RUN_MS = 3 * 60_000;
 const MAX_PURCHASE_REQUESTS = 6;
 const MAX_TASK_LENGTH = 300;
 
@@ -114,6 +120,8 @@ export async function startAgentRun(
 /** Runs the loop to the end. Never throws: every failure ends the run with a plain message. */
 export async function runAgent(deps: AgentDeps, runId: string): Promise<void> {
   const { db, model, catalog } = deps;
+  const now = deps.now ?? Date.now;
+  const deadline = now() + (deps.maxRunMs ?? MAX_RUN_MS);
   try {
     const [run] = await db.query<AgentRunRow>("SELECT * FROM agent_runs WHERE id = $1", [runId]);
     if (!run || run.status !== "running") return;
@@ -136,7 +144,17 @@ export async function runAgent(deps: AgentDeps, runId: string): Promise<void> {
     let purchaseRequests = 0;
 
     for (let turn = 0; turn < MAX_TURNS; turn++) {
-      const reply = await model.chat({ messages, tools: TOOLS, maxTokens: 1500 });
+      if (now() >= deadline) {
+        return finish(
+          db,
+          runId,
+          "failed",
+          null,
+          "The agent is unavailable: it ran past its time limit. Purchases already made still stand.",
+        );
+      }
+      // Low reasoning effort was enough for choosing tools in S10, and keeps turns small.
+      const reply = await model.chat({ messages, tools: TOOLS, maxTokens: 1500, reasoningEffort: "low" });
       if (!reply.ok) {
         const why =
           reply.reason === "not_configured"

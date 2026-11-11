@@ -81,8 +81,9 @@ describe("reviewer", () => {
 });
 
 describe("Groq model", () => {
+  // Groq answers with a JSON content type. The SDK reads any other body as text.
   const reply = (body: unknown, status = 200, headers: Record<string, string> = {}) =>
-    new Response(JSON.stringify(body), { status, headers });
+    new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", ...headers } });
   const ok = { choices: [{ finish_reason: "stop", message: { content: "hi" } }] };
 
   it("reports not_configured without calling the network when there is no key", async () => {
@@ -212,6 +213,33 @@ describe("agent", () => {
     const run = await start();
     await runAgent(deps, run.id);
     expect(await purchases()).toHaveLength(6);
+  });
+
+  it("ends the run as failed once it passes its time limit, and keeps earlier purchases", async () => {
+    const { deps, start, load, purchases, model } = await setup([
+      tools(call("c1", "request_purchase", { product_id: "seed-milk", quantity: 1 })),
+      tools(call("c2", "request_purchase", { product_id: "seed-bananas", quantity: 1 })),
+      answer("Done."),
+    ]);
+    // Each read of the clock moves it a minute on, so the third turn is past the 3-minute cap.
+    let clock = 0;
+    const now = () => (clock += 60_000);
+    const run = await start();
+    await runAgent({ ...deps, now }, run.id);
+
+    const failed = await load(run.id);
+    expect(failed.status).toBe("failed");
+    expect(failed.error).toMatch(/unavailable/);
+    expect(failed.error).toMatch(/time limit/);
+    expect(await purchases()).toHaveLength(2);
+    expect(model.requests).toHaveLength(2);
+  });
+
+  it("asks for low reasoning effort on agent turns", async () => {
+    const { deps, start, model } = await setup([answer("Nothing to buy.")]);
+    const run = await start();
+    await runAgent(deps, run.id);
+    expect(model.requests[0].reasoningEffort).toBe("low");
   });
 
   it("allows one open run per agent and only the owner may start one", async () => {
