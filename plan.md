@@ -104,7 +104,7 @@ Database tests need `docker compose up -d db` first. From step M2 on, the race t
 | M4 | Walk the built flows against the PayPal sandbox | Agent + You | M1, M3, S06a | pending | D | N3 |
 | M5 | Reconcile the code and the architecture | Agent | M1 | done | D | N1 |
 | **Phase C: Shared pools (PRD milestone 3), MVP built** | | | | | | |
-| S19 | Drizzle schema, migrations and the missing tables | Agent | M1, M2 | in-progress | D | N2 |
+| S19 | Drizzle schema, migrations and the missing tables | Agent | M1, M2 | done | D | N2 |
 | S20 | Ledger module | Agent | M2 | in-progress | P | I1 |
 | S21 | Hard rules | Agent | S19 | done | |  |
 | S22 | Payment rail seam | Agent | S08 | in-progress | D | N4 |
@@ -728,7 +728,7 @@ Each step starts with **MVP status** (what the code already does) and lists what
 ### S48: Production deploy (Agent + You)
 
 **Context:** Arch 2, ADR-0002, `docs/spike/S12.md`. Reuse the S12 Render service and Supabase project, since free Render allows only one always-awake service. **Your part:** enter secrets in Render and GitHub, and register the production webhook in PayPal.
-**Do:** Deploy the app, set `APP_URL` so PayPal's return links are correct, and schedule the tick (S41a). Until S19 adds migrations the app creates its schema at startup, so no agent needs to handle the production `DATABASE_URL`. After S19, run migrations as a host job instead. M3 makes the app refuse to start in production without `DATABASE_URL`. Add no card. If S12 chose the fallback, use arch Q10.
+**Do:** Deploy the app, set `APP_URL` so PayPal's return links are correct, and schedule the tick (S41a). The app applies the Drizzle migrations in `drizzle/` at startup (S19, ADR-0010), so no agent needs to handle the production `DATABASE_URL`. On the first deploy after S19, check the startup log for the migration step and that the S12 database kept its rows. M3 makes the app refuse to start in production without `DATABASE_URL`. Add no card. If S12 chose the fallback, use arch Q10.
 **Check:** the hosted app passes a sandbox purchase and receives its webhook. The scheduled calls appear in the GitHub Actions log, and the app stays awake across several hours (the part of S12 left open).
 **Done when:** the URL is stable and the tick is running.
 

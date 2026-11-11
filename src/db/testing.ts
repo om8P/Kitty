@@ -9,7 +9,7 @@ import { Pool } from "pg";
 import { onTestFinished } from "vitest";
 import type { Database, Queryable } from "@/domain/ports";
 import { wrapPool } from "./client";
-import { SCHEMA_STATEMENTS } from "./schema";
+import { runMigrations } from "./migrate";
 import { DATABASE_NOT_RUNNING_MESSAGE, TEST_SCHEMA_PREFIX, testDatabaseUrl } from "./testing-config";
 
 export type TestDatabaseOptions = {
@@ -21,7 +21,7 @@ export type TestDatabaseOptions = {
   pauses?: { after: RegExp; ms: number }[];
 };
 
-/** A fresh, empty database with the schema applied, dropped when the test ends. */
+/** A fresh, empty database with the migrations applied, dropped when the test ends. */
 export async function openTestDatabase(options: TestDatabaseOptions = {}): Promise<Database> {
   const schema = `${TEST_SCHEMA_PREFIX}${randomUUID().replace(/-/g, "")}`;
   const pool = new Pool({
@@ -45,8 +45,9 @@ export async function openTestDatabase(options: TestDatabaseOptions = {}): Promi
     await pool.end().catch(() => undefined);
   });
 
+  // The same migrations the app runs, recorded inside this test's schema.
+  await runMigrations(pool, { migrationsSchema: schema });
   const database = wrapPool(pool);
-  for (const statement of SCHEMA_STATEMENTS) await database.query(statement);
   return options.pauses?.length ? withPauses(database, options.pauses) : database;
 }
 

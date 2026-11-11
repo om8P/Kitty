@@ -21,6 +21,8 @@ ENV NODE_ENV=production \
     HOSTNAME=0.0.0.0
 COPY --from=build --chown=node:node /app/.next/standalone ./
 COPY --from=build --chown=node:node /app/.next/static ./.next/static
+# The app applies these migrations at startup (ADR-0010). Standalone output does not include them.
+COPY --from=build --chown=node:node /app/drizzle ./drizzle
 USER node
 EXPOSE 3000
 CMD ["node", "server.js"]

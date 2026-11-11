@@ -38,5 +38,14 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
+      # The committed migrations must match src/db/schema.ts (ADR-0010).
+      - name: Check migrations match the schema
+        run: |
+          npm run db:generate
+          if [ -n "$(git status --porcelain drizzle)" ]; then
+            echo "::error::src/db/schema.ts has changes with no migration. Run npm run db:generate and commit drizzle/."
+            git status --porcelain drizzle
+            exit 1
+          fi
       - run: npm test
       - run: npm run build

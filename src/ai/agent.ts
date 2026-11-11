@@ -9,6 +9,7 @@
 import { z } from "zod";
 import { formatUsd } from "@/domain/money";
 import type { Catalog, Database } from "@/domain/ports";
+import { SELECT_MEMBERS } from "@/domain/stores";
 import { submitPurchase, type PurchaseDeps } from "@/domain/purchases";
 import { memberRemaining } from "@/domain/rules";
 import {
@@ -88,7 +89,7 @@ export async function startAgentRun(
   if (pool.status !== "active") throw new DomainError("conflict", "This pool isn't open for spending.");
 
   const [member] = await db.query<MemberRow>(
-    "SELECT * FROM pool_members WHERE pool_id = $1 AND kind = 'agent' AND active ORDER BY position LIMIT 1",
+    `${SELECT_MEMBERS} WHERE pool_id = $1 AND kind = 'agent' AND active ORDER BY position LIMIT 1`,
     [pool.id],
   );
   if (!member) throw new DomainError("conflict", "This pool has no shopping agent.");
@@ -117,7 +118,7 @@ export async function runAgent(deps: AgentDeps, runId: string): Promise<void> {
     const [run] = await db.query<AgentRunRow>("SELECT * FROM agent_runs WHERE id = $1", [runId]);
     if (!run || run.status !== "running") return;
     const [pool] = await db.query<PoolRow>("SELECT * FROM pools WHERE id = $1", [run.pool_id]);
-    const [member] = await db.query<MemberRow>("SELECT * FROM pool_members WHERE id = $1", [run.member_id]);
+    const [member] = await db.query<MemberRow>(`${SELECT_MEMBERS} WHERE id = $1`, [run.member_id]);
 
     const steps: AgentStep[] = [];
     const addStep = async (step: AgentStep) => {

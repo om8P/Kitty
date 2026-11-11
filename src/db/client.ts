@@ -1,7 +1,7 @@
 import type { Pool } from "pg";
 import type { Database, Queryable } from "@/domain/ports";
 import { pgConfig } from "./connection";
-import { SCHEMA_STATEMENTS } from "./schema";
+import { runMigrations } from "./migrate";
 
 /**
  * One database handle per process: a `pg` pool on DATABASE_URL (Supabase when
@@ -38,12 +38,17 @@ async function open(): Promise<Database> {
   const pool = new Pool({ ...config, max: 5, connectionTimeoutMillis: 10_000 });
   // An idle client that errors must not crash the process.
   pool.on("error", () => undefined);
-  const database = wrapPool(pool);
-  for (const statement of SCHEMA_STATEMENTS) await database.query(statement);
-  return database;
+  // Drizzle owns the schema: apply any pending migration before serving (ADR-0010).
+  await runMigrations(pool);
+  return wrapPool(pool);
 }
 
-/** Adapts a `pg` pool to the domain's Database port. Each transaction uses one client. */
+/**
+ * Adapts a `pg` pool to the domain's Database port. Each transaction uses one
+ * client. This stays on `pg` rather than Drizzle's session, because Drizzle's
+ * driver returns timestamps as strings for raw SQL and the domain reads Dates
+ * (ADR-0010).
+ */
 export function wrapPool(pool: Pool): Database {
   return {
     async query<T>(sql: string, params: unknown[] = []) {

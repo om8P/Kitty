@@ -4,7 +4,7 @@
  */
 import type { Database, PaymentRail } from "./ports";
 import { poolAvailable } from "./rules";
-import { isStore } from "./stores";
+import { isStore, SELECT_MEMBERS } from "./stores";
 import {
   DomainError,
   newId,
@@ -64,21 +64,27 @@ export async function createPool(
       [poolId, input.householdId, input.ownerUserId, input.goal.trim(), input.termDays, endsAt, rail.name, input.amountCents],
     );
     for (const [position, member] of input.members.entries()) {
+      const memberId = newId();
       await tx.query(
         `INSERT INTO pool_members
-           (id, pool_id, kind, user_id, label, limit_cents, approval_threshold_cents, allowed_stores, position)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9)`,
+           (id, pool_id, kind, user_id, label, limit_cents, approval_threshold_cents, position)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
         [
-          newId(),
+          memberId,
           poolId,
           member.kind,
           member.userId,
           member.label.trim(),
           member.limitCents,
           member.approvalThresholdCents,
-          JSON.stringify(member.allowedStores),
           position,
         ],
+      );
+      await tx.query(
+        `INSERT INTO member_stores (member_id, store_name, position)
+         SELECT $1, store.name, store.position - 1
+         FROM unnest($2::text[]) WITH ORDINALITY AS store(name, position)`,
+        [memberId, member.allowedStores],
       );
     }
   });
@@ -234,7 +240,7 @@ export async function getPoolState(db: Database, poolId: string): Promise<PoolSt
   const [pool] = await db.query<PoolRow>("SELECT * FROM pools WHERE id = $1", [poolId]);
   if (!pool) return null;
   const [members, purchases, runs] = await Promise.all([
-    db.query<MemberRow>("SELECT * FROM pool_members WHERE pool_id = $1 ORDER BY position", [poolId]),
+    db.query<MemberRow>(`${SELECT_MEMBERS} WHERE pool_id = $1 ORDER BY position`, [poolId]),
     db.query<PurchaseRow>("SELECT * FROM purchases WHERE pool_id = $1 ORDER BY created_at DESC LIMIT 200", [poolId]),
     db.query<AgentRunRow>("SELECT * FROM agent_runs WHERE pool_id = $1 ORDER BY created_at DESC LIMIT 3", [poolId]),
   ]);

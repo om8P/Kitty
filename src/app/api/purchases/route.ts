@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { submitPurchase } from "@/domain/purchases";
+import { SELECT_MEMBERS } from "@/domain/stores";
 import { DomainError, type MemberRow } from "@/domain/types";
 import { toPurchaseView } from "@/lib/views";
 import { loadHouseholdPool } from "@/server/api";
@@ -27,7 +28,7 @@ export async function POST(request: Request) {
     if (!body.success) throw new DomainError("invalid", "That request wasn't complete. Try again.");
 
     const pool = await loadHouseholdPool(db, session, body.data.poolId);
-    const [member] = await db.query<MemberRow>("SELECT * FROM pool_members WHERE pool_id = $1 AND user_id = $2", [
+    const [member] = await db.query<MemberRow>(`${SELECT_MEMBERS} WHERE pool_id = $1 AND user_id = $2`, [
       pool.id,
       session.user.id,
     ]);

@@ -2,6 +2,7 @@
 import { openTestDatabase, type TestDatabaseOptions } from "@/db/testing";
 import { confirmPool, createDemoHousehold, createPool, type NewMember } from "./pools";
 import type { Database, PaymentRail, RailResult, ReviewFacts, ReviewResult, Reviewer } from "./ports";
+import { SELECT_MEMBERS } from "./stores";
 import type { PurchaseDeps } from "./purchases";
 import { newId, type MemberRow, type PoolRow, type UserRow } from "./types";
 
@@ -128,7 +129,9 @@ export async function createWorld(
 
   const reload = async () => {
     const [pool] = await db.query<PoolRow>("SELECT * FROM pools WHERE id = $1", [created.id]);
-    const members = await db.query<MemberRow>("SELECT * FROM pool_members WHERE pool_id = $1 ORDER BY position", [created.id]);
+    const members = await db.query<MemberRow>(`${SELECT_MEMBERS} WHERE pool_id = $1 ORDER BY position`, [
+      created.id,
+    ]);
     return { pool, teen: members[0], agent: members[1] };
   };
   const loaded = await reload();
