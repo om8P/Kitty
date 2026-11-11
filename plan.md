@@ -569,8 +569,8 @@ Each step starts with **MVP status** (what the code already does) and lists what
 ### S28: Model seam and Groq adapter
 
 **MVP status:** `src/ai/model.ts` calls Groq with `fetch`. It makes one call at a time, retries once on a rate limit within 20 seconds, checks the finish reason, and reports every problem as a typed failure that never means `allow`. `src/server/container.ts` stops AI calls at 800 a day, app-wide, counted in `usage_counters`.
-**Left:** Replace the `fetch` wrapper with the `groq-sdk` package, as arch 2 says, behind the same `Model` interface so the reviewer and agent don't change. Keep one call at a time, the retry-delay handling and the typed failures. Add tests for pacing, for the cap surviving a restart and for each failure type. The per-household cap and the AI-off switch are done in S49.
-**Check:** the tests above pass with the fake provider.
+**Left:** Replace the `fetch` wrapper with the `groq-sdk` package, as arch 2 says, behind the same `Model` interface so the reviewer and agent don't change. Keep one call at a time, the retry-delay handling and the typed failures. Add tests for pacing, for the cap surviving a restart and for each failure type. The per-household cap and the AI-off switch are done in S49. Add a wall-clock cap to each agent run (arch 5.7), which M5 found missing: a run that passes it ends as failed with "agent unavailable", and purchases already made stand.
+**Check:** the tests above pass with the fake provider, including a run that hits the time cap.
 **Done when:** every failure returns a typed failure, never `allow`.
 
 ### S29: AI purchase reviewer

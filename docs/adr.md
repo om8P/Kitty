@@ -12,6 +12,7 @@ Key decisions behind `docs/architecture.md`. Most are still `proposed`. ADR-0002
 | 0006 | Build pools on PayPal authorization and partial capture | accepted (S08, 2026-11-11) | 2026-11-10 |
 | 0007 | Keep Channel3 behind a catalog seam with minimal storage | proposed | 2026-11-10 |
 | 0008 | Product direction: continue, both user groups equal, honest hold wording, adversarial demo | accepted | 2026-11-11 |
+| 0009 | Match the model and catalog seams, and the ledger's entry kinds, to the built code | accepted | 2026-11-11 |
 
 ---
 
@@ -349,3 +350,38 @@ The S18 gate asks whether to continue, which user group leads, and whether to ma
 
 #### Risks
 - "Pool" still collides with PayPal Pools. Screens must keep Kitty's own name and the "Sandbox" label so no one mistakes Kitty for PayPal (`rules.md`).
+
+---
+
+## ADR-0009: Match the model and catalog seams, and the ledger's entry kinds, to the built code
+
+**Date**: 2026-11-11
+**Status**: accepted (M5)
+**Deciders**: Project owner, with Claude Code
+
+### Context
+
+M5 compared the MVP with `docs/architecture.md` (list in `docs/arch-reconciliation.md`). Three differences were on no known list. Arch 3 describes the model seam as two functions, `reviewPurchase` and `agentTurn`, chosen by `AI_PROVIDER`. The code has one `Model` interface, a single chat call with typed failures, and the reviewer and agent runner are built on top of it. Arch 3 gives the catalog seam `search` and `getProduct`. The code has `search` and `featured`, and the purchase service reads the product row by its local ID. The ledger also writes an `authorize` entry when a pool is approved, which arch 6 doesn't list.
+
+### Decision
+
+Amend the architecture to match the code. The model seam is one `Model` interface. The reviewer (`src/ai/reviewer.ts`) and agent runner (`src/ai/agent.ts`) sit on it, and `AI_PROVIDER` picks the adapter once a second one exists (E1). The catalog seam is `search` and `featured`, and a product is always read from `products` by its local ID. `ledger_entries.kind` includes `authorize`.
+
+### Alternatives Considered
+
+#### Reshape the code to the arch
+- **Pros**: No arch edit.
+- **Cons**: A rewrite of working, tested code before the deadline, for no change in behavior.
+- **Why not**: Every rule the seams protect (typed failures, no `allow` on failure, local IDs and prices) already holds.
+
+### Consequences
+
+#### Positive
+- S28 keeps the `Model` interface when it adopts `groq-sdk`, so the reviewer and agent don't change.
+
+#### Negative
+- A second provider (E1) has to fit the chat-shaped interface.
+
+#### Risks
+- None to money. The `authorize` entry records the approved amount and moves no counter.
+
