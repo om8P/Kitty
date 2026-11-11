@@ -86,8 +86,8 @@ Database tests need `docker compose up -d db` first. From step M2 on, the race t
 | S06a | Spike: refund and void | Agent + You | S05 | pending | D | N3 |
 | S06b | Spike: reauthorize | Agent + You | S05 | blocked | P | I3 |
 | S07 | Spike: webhooks and read calls | Agent + You | S06a | pending | D | N3 |
-| S08 | **Gate:** record the feasibility decision | Agent + You | S05 | pending | D | N1 |
-| S08a | Spike the token fallback (only if S08 chose it) | Agent + You | S08 | pending | D | N1 |
+| S08 | **Gate:** record the feasibility decision | Agent + You | S05 | done | D | N1 |
+| S08a | Spike the token fallback (only if S08 chose it) | Agent + You | S08 | skipped | D | N1 |
 | S09 | Check AG Grid and Drizzle row locks | Agent | S03 | done | |  |
 | S10 | Trial Groq tool calls and strict output | Agent + You | S02, S03 | pending | D | N2 |
 | S11 | Sample Channel3 and ask about its terms | Agent + You | S02, S03 | done | |  |
@@ -96,13 +96,13 @@ Database tests need `docker compose up -d db` first. From step M2 on, the race t
 | **Phase B: Product direction (PRD milestone 2)** | | | | | | |
 | S15 | Finish competitor and PayPal research | Agent | S01 | done | |  |
 | S15a | Record the hackathon rules | Agent | S01 | done | |  |
-| S18 | **Gate:** product direction decision | Agent + You | S15, S15a | pending | D | N1 |
+| S18 | **Gate:** product direction decision | Agent + You | S15, S15a | done | D | N1 |
 | **Phase M: Adopt the MVP (new in v2)** | | | | | | |
-| M1 | Land the MVP and sync this plan | Agent + You | S08 | pending | D | N1 |
-| M2 | Move tests to real Postgres and add race tests | Agent | M1 | pending | D | N1 |
-| M3 | Remove simulated payments and PGlite from the app | Agent | M1 | pending | D | N1 |
+| M1 | Land the MVP and sync this plan | Agent + You | S08 | done | D | N1 |
+| M2 | Move tests to real Postgres and add race tests | Agent | M1 | done | D | N1 |
+| M3 | Remove simulated payments and PGlite from the app | Agent | M1 | done | D | N1 |
 | M4 | Walk the built flows against the PayPal sandbox | Agent + You | M1, M3, S06a | pending | D | N3 |
-| M5 | Reconcile the code and the architecture | Agent | M1 | pending | D | N1 |
+| M5 | Reconcile the code and the architecture | Agent | M1 | done | D | N1 |
 | **Phase C: Shared pools (PRD milestone 3), MVP built** | | | | | | |
 | S19 | Drizzle schema, migrations and the missing tables | Agent | M1, M2 | in-progress | D | N2 |
 | S20 | Ledger module | Agent | M2 | in-progress | P | I1 |
@@ -519,7 +519,7 @@ Each step starts with **MVP status** (what the code already does) and lists what
 - Add `verifyWebhookSignature` and `getCapture` (with S38).
 - Add `getPoolPaymentState` (with S45) and `refreshHold` (with S44).
 - Add the `holdsRealFunds` flag from arch 3, set to true for this adapter.
-- After M3 the scriptable fake lives in the test helpers only.
+- After M3 the scriptable fake lives in the test helpers only (done in N1: `createFakeRail` in `src/domain/testing.ts`, name `test`).
 
 **Check:** unit tests prove retries reuse the same request ID, for each new method too.
 **Done when:** nothing outside the adapter knows PayPal details, and the interface matches arch 3.
@@ -896,3 +896,7 @@ Every change gets one line in the Change log.
 | 2026-11-11 | S41a now depends on M2 and S38 instead of S40, S40 now depends on S41a, and S45 also depends on S19 | The tick is built before the gate session, and the paused state needs the S19 tables |
 | 2026-11-11 | Added S29a (strict review schema) | The MVP uses `json_object` plus Zod, and the arch specifies strict schema. It waits on S10 |
 | 2026-11-11 | S19 now means migrations and the missing tables, S20 means extracting the ledger module, and S49 adds the per-household AI cap and AI-off switch | The MVP runs startup SQL, keeps ledger SQL inline, and has only an app-wide AI cap |
+| 2026-11-11 | S08 `done`: the owner confirmed authorize-and-capture (ADR-0006 accepted, note under ADR-0003). S08a `skipped` | `docs/spike/S05.md` answered Q1 and Q2, and the MVP is built on that path |
+| 2026-11-11 | S18 `done`: continue, both user groups equal, reword "reserved" to the PayPal hold, add an adversarial demo moment, keep "pool" and no shopping-service framing (ADR-0008). The owner approved the PRD edits, and PRD milestone 2 is complete | The owner's decision on the S15 research |
+| 2026-11-11 | M1 `done`. N1 runs on `session/N1-land-harden` instead of `step/mvp-demo-flow`, here and in `rules.md` | Pull request 16 had already merged the MVP to `main` |
+| 2026-11-11 | M2, M3 and M5 `done`. M5's list is `docs/arch-reconciliation.md`. S28 now also adds a wall-clock cap to agent runs, and the model and catalog seams and the `authorize` ledger entry are amended in the arch (ADR-0009) | M5 found these three differences on no list, and the owner chose how to resolve each |
