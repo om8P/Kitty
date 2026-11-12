@@ -135,6 +135,18 @@ describe("Groq model seam", () => {
       expect(await model.chat({ messages })).toEqual({ ok: false, reason: "rate_limited" });
       expect(net.bodies).toHaveLength(1);
     });
+
+    it("waits out a longer window when the call allows it, as agent turns do (S49)", async () => {
+      const waits: number[] = [];
+      const net = scripted([
+        reply(ok, 200, { "x-ratelimit-remaining-tokens": "10", "x-ratelimit-reset-tokens": "45s" }),
+        reply(ok),
+      ]);
+      const model = createGroqModel(key, { fetch: net.fetch, sleep: async (ms) => void waits.push(ms), now: () => 1_000 });
+      await model.chat({ messages });
+      expect(await model.chat({ messages, maxWaitMs: 61_000 })).toMatchObject({ ok: true });
+      expect(waits).toEqual([45_000]);
+    });
   });
 
   describe("rate limits", () => {

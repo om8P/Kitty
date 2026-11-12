@@ -103,6 +103,18 @@ export type ReviewResult =
   | { decision: "allow" | "flag" | "block"; reason: string }
   | { decision: "unavailable"; reason: string };
 
+/**
+ * Per-household daily AI allowance (architecture Security, "AI quota"), on top
+ * of the app-wide cap in the model seam. `off` means the AI switch is off.
+ * Each call counts one use. Any failure to count must answer `limit`, never `ok`.
+ */
+export type AiAllowance = "ok" | "off" | "limit";
+
+export interface AiQuota {
+  takeReview(householdId: string): Promise<AiAllowance>;
+  takeAgentRun(householdId: string): Promise<AiAllowance>;
+}
+
 export interface Reviewer {
   /** Never throws. Any failure is `unavailable`, which sends the purchase to the owner. */
   review(facts: ReviewFacts): Promise<ReviewResult>;

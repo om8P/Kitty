@@ -5,7 +5,7 @@
  * locks the pool row, so two purchases can never spend the same money. No
  * transaction is ever held open across an AI or PayPal call.
  */
-import type { Database, PaymentRail, Queryable, RailResult, Reviewer } from "./ports";
+import type { AiQuota, Database, PaymentRail, Queryable, RailResult, ReviewResult, Reviewer } from "./ports";
 import { SELECT_MEMBERS } from "./stores";
 import { checkHardRules, finalOutcome } from "./rules";
 import {
@@ -23,6 +23,8 @@ export type PurchaseDeps = {
   db: Database;
   rail: PaymentRail;
   reviewer: Reviewer;
+  /** Per-household AI caps and the AI-off switch (S49). Without one, every review runs. */
+  quota?: AiQuota;
   now?: () => Date;
 };
 
@@ -104,17 +106,28 @@ export async function submitPurchase(
   }
   if (started.purchase.status !== "reviewing") return started.purchase;
 
-  // AI review, outside any transaction. The reviewer never throws.
-  const review = await deps.reviewer.review({
-    poolGoal: started.pool.goal,
-    memberLabel: started.member.label,
-    memberKind: started.member.kind,
-    store: product.store,
-    quantity: input.quantity,
-    amountCents,
-    productTitle: product.title,
-    productDescription: product.description,
-  });
+  // AI review, outside any transaction. The reviewer never throws. A household
+  // at its daily AI cap, or AI switched off, counts as unavailable: the owner decides.
+  const allowance = deps.quota ? await deps.quota.takeReview(started.pool.household_id) : "ok";
+  const review: ReviewResult =
+    allowance === "ok"
+      ? await deps.reviewer.review({
+          poolGoal: started.pool.goal,
+          memberLabel: started.member.label,
+          memberKind: started.member.kind,
+          store: product.store,
+          quantity: input.quantity,
+          amountCents,
+          productTitle: product.title,
+          productDescription: product.description,
+        })
+      : {
+          decision: "unavailable",
+          reason:
+            allowance === "off"
+              ? "AI review is switched off, so the owner decides."
+              : "This household has used today's AI reviews, so the owner decides.",
+        };
 
   const outcome = finalOutcome(started.needsApproval, review.decision);
   const purchaseId = started.purchase.id;

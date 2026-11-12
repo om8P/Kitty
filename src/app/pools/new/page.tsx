@@ -18,7 +18,7 @@ export default async function NewPoolPage({ searchParams }: { searchParams: Prom
   const teen = session.users.find((user) => user.role === "member");
 
   return (
-    <Shell session={session} active="pools" payments={rail.name} narrow>
+    <Shell session={session} active="pools" payments={rail.name}>
       <div className="stack stack--loose">
         <div className="stack stack--tight">
           <p className="small">
