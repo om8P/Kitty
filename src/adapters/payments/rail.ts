@@ -9,6 +9,7 @@
 import type { PaymentRail, RailResult } from "@/domain/ports";
 import { decimalToCents, toDecimalString } from "@/domain/money";
 import { createPayPalClient, type PayPalAuthorization, type PayPalClient, type PayPalResult } from "./paypal-client";
+import { parseWebhookEvent } from "./webhook-event";
 
 type Env = Record<string, string | undefined>;
 
@@ -24,6 +25,8 @@ export function createRail(env: Env = process.env): PaymentRail {
 export function createPayPalRail(client: PayPalClient): PaymentRail {
   return {
     name: "paypal",
+    // Authorize and capture holds the payer's money until the pool closes.
+    holdsRealFunds: true,
 
     async createPoolPayment({ poolId, amountCents, returnUrl, cancelUrl }) {
       const result = await client.createOrder({
@@ -81,6 +84,23 @@ export function createPayPalRail(client: PayPalClient): PaymentRail {
       }
       return { outcome: "unknown", reason: result.reason };
     },
+
+    async verifyWebhookSignature({ rawBody, headers }) {
+      const parsed = parseWebhookEvent(rawBody);
+      if (!parsed.ok) return { outcome: "failed", code: "invalid_webhook_body", message: "The webhook body isn't a PayPal event" };
+      const result = await client.verifyWebhookSignature({ rawBody, headers });
+      return map(result, () => ({ event: parsed.event }));
+    },
+
+    async getCapture({ captureId }) {
+      const result = await client.getCapture(captureId);
+      return map(result, (capture) => ({
+        captureId: capture.id,
+        status: capture.status,
+        amountCents: decimalToCents(capture.amount?.value),
+        purchaseId: capture.invoice_id?.startsWith("kitty-") ? capture.invoice_id.slice("kitty-".length) : null,
+      }));
+    },
   };
 }
 
@@ -95,11 +115,14 @@ export function createUnconfiguredRail(): PaymentRail {
     ({ outcome: "unsupported", code: "PAYPAL_NOT_SET_UP", message: PAYPAL_NOT_SET_UP }) as const;
   return {
     name: "unconfigured",
+    holdsRealFunds: false,
     createPoolPayment: refuse,
     confirmPoolPayment: refuse,
     charge: refuse,
     refund: refuse,
     releaseHold: refuse,
+    verifyWebhookSignature: refuse,
+    getCapture: refuse,
   };
 }
 

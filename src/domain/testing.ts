@@ -1,7 +1,7 @@
 /** Test helpers: a fresh schema on the test Postgres, a scriptable payment rail and reviewer, and a ready-made pool. */
 import { openTestDatabase, type TestDatabaseOptions } from "@/db/testing";
 import { confirmPool, createDemoHousehold, createPool, type NewMember } from "./pools";
-import type { Database, PaymentRail, RailResult, ReviewFacts, ReviewResult, Reviewer } from "./ports";
+import type { Database, PaymentEvent, PaymentRail, RailResult, ReviewFacts, ReviewResult, Reviewer } from "./ports";
 import { SELECT_MEMBERS } from "./stores";
 import type { PurchaseDeps } from "./purchases";
 import { newId, type MemberRow, type PoolRow, type UserRow } from "./types";
@@ -13,17 +13,34 @@ export type FakeRail = PaymentRail & {
   nextCharge: RailResult<{ captureId: string }> | null;
   nextRefund: RailResult<{ refundId: string }> | null;
   nextRelease: RailResult<Record<string, never>> | null;
+  /** What the next signature check returns. Defaults to the event as `verified`. */
+  nextVerify: RailResult<{ event: PaymentEvent | null }> | null;
+  /** Captures `getCapture` knows, by capture ID. */
+  captures: Map<string, { status: string; amountCents: number | null; purchaseId: string | null }>;
 };
 
 export function createFakeRail(): FakeRail {
   const rail: FakeRail = {
     name: "test",
+    holdsRealFunds: true,
     charges: [],
     refunds: [],
     releases: [],
     nextCharge: null,
     nextRefund: null,
     nextRelease: null,
+    nextVerify: null,
+    captures: new Map(),
+    async verifyWebhookSignature() {
+      const scripted = rail.nextVerify;
+      rail.nextVerify = null;
+      return scripted ?? { outcome: "failed", code: "signature_invalid", message: "No event scripted" };
+    },
+    async getCapture({ captureId }) {
+      const known = rail.captures.get(captureId);
+      if (!known) return { outcome: "failed", code: "RESOURCE_NOT_FOUND", message: "No such capture" };
+      return { outcome: "succeeded", data: { captureId, ...known } };
+    },
     async createPoolPayment({ poolId, returnUrl }) {
       return { outcome: "succeeded", data: { orderId: `ORDER-${poolId}`, approvalUrl: `${returnUrl}?token=ORDER-${poolId}` } };
     },
