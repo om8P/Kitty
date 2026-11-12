@@ -44,3 +44,47 @@ Every capture carries `invoice_id: kitty-{purchase id}`, matching its Kitty purc
   - `MAX_CAPTURE_AMOUNT_EXCEEDED` was classified `unknown` instead of `failed` (S06a).
   - `CATALOG_PROVIDER=seeded`, the plan's spelling, was not recognized, so the app would have used Channel3 whenever its key was set.
 - **Not checked here:** a capture decline (the sandbox can't force one), and the phone layout beyond what the flows needed (S50 and E3).
+
+## S40: milestone 3 scenarios (gate)
+
+**Run on 2026-11-12, session N5, branch `session/N5-gate-deploy`.** `scripts/gate/s40-scenarios.ts` drove the app's own wiring (`getContainer`): the Docker Postgres, the real PayPal sandbox rail and the live Groq reviewer (`openai/gpt-oss-120b`), with the seeded catalog. The owner approved a $40 "Weekly groceries" pool at PayPal as the sandbox buyer. Sam (teen): $40 limit, no rule-based approval, Fresh Market, Corner Pharmacy, Style Street and Gadget Hub. Shopping agent: $40 limit, Fresh Market.
+
+| # | Scenario | Result |
+|---|---|---|
+| 1 | Replay: milk ($3.89) sent twice with one idempotency key | Pass. One purchase, `captured`, one capture at PayPal |
+| 2 | Rule breakers: a store not allowed, over the member limit ($59.99), over the pool balance (7 cereal, $37.03 against $36.11 left), and the agent after the owner removed it | Pass. All four `rejected_by_rules` with the expected code (`store_not_allowed`, `over_member_limit`, `over_pool_balance`, `member_inactive`), no `ai_decision`, and 0 AI requests counted while they ran |
+| 3 | Off-goal spot check, live reviewer: gift card, the mystery figure with an instruction hidden in its description, energy drinks, hoodie, gaming mouse, phone charger | Pass, 6 of 6. Five `blocked_by_ai`, energy drinks flagged (`awaiting_approval`, then denied by the owner). The reviewer named the hidden instruction. A spot check, not a measured rate (S39 measures it after the submission) |
+| 4 | Race tests on real Postgres (`src/domain/races.test.ts`) | Pass, 4 of 4. 0 pools overspent |
+| 5 | Pool integrity: Kitty's captured total against PayPal's order | Pass. Kitty $3.89 in 1 capture, PayPal $3.89 in 1, every capture's `invoice_id` names its purchase. Reserved $0 |
+| 6 | Close | The pool closed and PayPal released the remaining $36.11 |
+
+Baseline at the time: lint, typecheck and 589 tests pass, including `tests/gate/s40-helpers.test.ts` for the integrity comparison. **S40 passes.**
+
+## S48: production deploy
+
+**Run on 2026-11-12, session N5.** The S12 Render free web service and Supabase free project, reused. The owner entered every secret in Render and GitHub, added a sandbox webhook for the hosted URL in PayPal, and deployed `main` (N4's code) by hand. No card was asked for or added. The hosted URL is kept out of this public repo.
+
+| Check | Result |
+|---|---|
+| `/api/health` | `status: "ok"`, `db: "ok"`, `dbTls: "verified"`, about 0.5 s warm |
+| Migrations | Applied. The app runs the Drizzle migrations before its first database call (ADR-0010) and logs no line for it, so the evidence is `db: "ok"` and the tick reading the tables that only the migrations create |
+| Tick without a secret, or with a wrong one | 401 both times |
+| Tick from the Schedule workflow with the repo's `CRON_SECRET` | 200 with every job count at 0 (a manual run at 08:27 UTC) |
+| Unsigned event to `/api/paypal/webhook` | 401, "The signature didn't verify." |
+| Sandbox purchase and its webhook | Passed in S47a below |
+| Scheduled runs | Green, but only about every 6 to 7 hours (18:09, 00:37 and 07:41 UTC), not every 5 minutes |
+| Stays awake | **No.** Render sleeps after 15 idle minutes, so between scheduled runs the first visitor waits for a cold start, and the tick's recovery runs only every few hours. See the finding |
+
+**Finding:** GitHub's schedule alone can't keep the free instance awake or run the tick often. A free outside pinger that calls `/api/health` every 10 minutes would keep it awake. That would be a new free service account, so it's the owner's decision (recorded in `plan.md`).
+
+## S47a: full-term pool, part 1
+
+**Started 2026-11-12 at 08:34 UTC on the hosted app.** The owner entered the access code, and the default pool was created from the screen: "Weekly groceries", $150, 4 weeks (ends Dec 10). Sam: $40 limit, asks above $15, Fresh Market and Corner Pharmacy. Shopping agent: $80, asks above $25, Fresh Market. The owner approved it at PayPal as the sandbox buyer and came back to an open pool.
+
+| Purchase | Kitty | PayPal sandbox |
+|---|---|---|
+| Sam: whole milk, $3.89 | "Paid", passed the rules and the AI check | Capture completed, $3.89, webhook delivered (Success) |
+| Sam: bananas, $1.59 | "Paid", Sam's limit left $34.52 | Capture completed, $1.59, webhook delivered (Success) |
+| The hold | $150 held, open | Authorization created, $150, webhook delivered (Success) |
+
+PayPal's sandbox event log lists one webhook delivery status per event for the app, not per URL. The older local ngrok webhook is still registered, so "Success" doesn't by itself name the hosted endpoint. The hosted endpoint's signature check is shown above (it refuses unsigned events), and N3 verified 16 of 16 real signatures on the same code. The pool stays active for S47b (session I3), which can run once its 3-day honor period has passed (after 2026-11-15 08:34 UTC).
