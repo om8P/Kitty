@@ -905,8 +905,18 @@ legend {
 .cell-two-line {
   display: flex;
   flex-direction: column;
+  width: 100%;
   min-width: 0;
   padding-block: 10px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* Let wrapped cell text use the column's width instead of overflowing it. */
+.ledger .ag-cell-value,
+.ledger .ag-cell-wrapper {
+  width: 100%;
+  min-width: 0;
 }
 
 .cell-two-line > span:last-child {
