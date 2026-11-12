@@ -293,6 +293,33 @@ export const ledgerEntries = pgTable(
   ],
 );
 
+/**
+ * Every verified PayPal webhook Kitty used, once (plan step S38). The unique
+ * event ID makes a repeated delivery a no-op. `unmatched` events, such as a
+ * refund that arrives before its capture settles, are tried again.
+ */
+export const webhookEvents = pgTable(
+  "webhook_events",
+  {
+    id: text("id").primaryKey(),
+    paypalEventId: text("paypal_event_id").notNull(),
+    eventType: text("event_type").notNull(),
+    /** The event in Kitty's own shape (`PaymentEvent`), not PayPal's raw body. */
+    payload: jsonb("payload").notNull(),
+    status: text("status").notNull(),
+    attempts: integer("attempts").notNull().default(1),
+    note: text("note"),
+    receivedAt: timestamptz("received_at").notNull().defaultNow(),
+    processedAt: timestamptz("processed_at"),
+  },
+  (t) => [
+    unique("webhook_events_paypal_event_id_key").on(t.paypalEventId),
+    check("webhook_events_status_check", sql`${t.status} IN ('processed', 'unmatched', 'contradiction')`),
+    check("webhook_events_attempts_check", sql`${t.attempts} >= 1`),
+    index("webhook_events_unmatched").on(t.receivedAt).where(sql`status = 'unmatched'`),
+  ],
+);
+
 export const usageCounters = pgTable(
   "usage_counters",
   {

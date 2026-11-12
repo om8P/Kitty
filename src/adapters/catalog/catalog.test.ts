@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { openTestDatabase } from "@/db/testing";
-import { cleanQuery, createCatalog, mapChannel3Product, storeForCategory } from "./catalog";
+import { submitPurchase } from "@/domain/purchases";
+import { createWorld } from "@/domain/testing";
+import {
+  CHANNEL3_MONTHLY_CAP,
+  cleanQuery,
+  createCatalog,
+  mapChannel3Product,
+  purgeUnpurchasedChannel3Products,
+  storeForCategory,
+} from "./catalog";
 import { SEED_PRODUCTS, searchSeed } from "./seed";
 
 // A made-up response in Channel3's shape (docs/spike/S11.md). No real product data.
@@ -130,6 +139,76 @@ describe("catalog", () => {
     const capped = createCatalog(db, { CHANNEL3_API_KEY: "test-key" }, { fetch: async () => ((called = true), new Response("{}")) });
     expect((await capped.search("milk"))[0].id).toBe("seed-milk");
     expect(called).toBe(false);
+  });
+
+  it("calls Channel3 for searches 1 to 900 of a month, never the 901st, and doesn't count a blocked search", async () => {
+    const db = await openTestDatabase();
+    let calls = 0;
+    const catalog = createCatalog(
+      db,
+      { CHANNEL3_API_KEY: "test-key" },
+      {
+        fetch: async () => ((calls += 1), new Response(JSON.stringify({ products: [] }))),
+        now: () => new Date("2026-11-20T12:00:00Z"),
+      },
+    );
+    const count = async (period: string) =>
+      (await db.query<{ count: number }>("SELECT count FROM usage_counters WHERE kind = 'channel3_search' AND period = $1", [period]))[0]
+        ?.count;
+
+    await db.query("INSERT INTO usage_counters (kind, period, count) VALUES ('channel3_search', '2026-11', $1)", [
+      CHANNEL3_MONTHLY_CAP - 1,
+    ]);
+    await catalog.search("milk");
+    expect(calls).toBe(1);
+    expect(await count("2026-11")).toBe(CHANNEL3_MONTHLY_CAP);
+
+    await catalog.search("milk");
+    await catalog.search("bread");
+    expect(calls).toBe(1);
+    expect(await count("2026-11")).toBe(CHANNEL3_MONTHLY_CAP);
+  });
+
+  it("starts each month's count from zero", async () => {
+    const db = await openTestDatabase();
+    let calls = 0;
+    const catalog = createCatalog(
+      db,
+      { CHANNEL3_API_KEY: "test-key" },
+      {
+        fetch: async () => ((calls += 1), new Response(JSON.stringify({ products: [] }))),
+        now: () => new Date("2026-12-01T00:00:01Z"),
+      },
+    );
+    await db.query("INSERT INTO usage_counters (kind, period, count) VALUES ('channel3_search', '2026-11', 900)");
+    await catalog.search("milk");
+    expect(calls).toBe(1);
+    const [december] = await db.query<{ count: number }>(
+      "SELECT count FROM usage_counters WHERE kind = 'channel3_search' AND period = '2026-12'",
+    );
+    expect(december.count).toBe(1);
+  });
+
+  it("keeps day-old Channel3 products that a purchase points to", async () => {
+    const world = await createWorld();
+    await world.db.query(
+      `INSERT INTO products (id, source, external_id, store, title, price_cents, fetched_at)
+       VALUES ('c3-bought', 'channel3', 'bought', 'Fresh Market', 'Bought', 100, now() - interval '30 hours'),
+              ('c3-stale', 'channel3', 'stale', 'Fresh Market', 'Stale', 100, now() - interval '30 hours'),
+              ('c3-fresh', 'channel3', 'fresh', 'Fresh Market', 'Fresh', 100, now() - interval '1 hour')`,
+    );
+    await submitPurchase(world.deps, {
+      poolId: world.pool.id,
+      memberId: world.teen.id,
+      productId: "c3-bought",
+      quantity: 1,
+      idempotencyKey: "purge-test",
+    });
+
+    expect(await purgeUnpurchasedChannel3Products(world.db)).toBe(1);
+    const left = await world.db.query<{ id: string }>("SELECT id FROM products WHERE source = 'channel3' ORDER BY id");
+    expect(left.map((row) => row.id)).toEqual(["c3-bought", "c3-fresh"]);
+    expect(await purgeUnpurchasedChannel3Products(world.db)).toBe(0);
   });
 
   it("deletes day-old Channel3 products nobody bought", async () => {

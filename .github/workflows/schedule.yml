@@ -2,7 +2,9 @@ name: Schedule
 
 # Kitty's scheduled call (ADR-0002). GitHub runs schedules only from the default
 # branch, every 5 minutes at most, and may delay or skip runs under load.
-# For S12 it calls /api/health. S41a points it at the authenticated tick.
+# It posts to the authenticated tick (S41a), which recovers stuck purchases and
+# keeps the free host awake. Until the CRON_SECRET repo secret is set, it calls
+# /api/health instead, so the host still stays awake.
 
 on:
   schedule:
@@ -25,12 +27,20 @@ jobs:
           # The app's public base URL, for example https://<name>.onrender.com.
           # Kept as a secret so it stays out of the public repo and logs.
           KITTY_BASE_URL: ${{ secrets.KITTY_BASE_URL }}
+          # The same value as CRON_SECRET on the host. GitHub masks it in logs.
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
           if [ -z "$KITTY_BASE_URL" ]; then
             echo "::notice::KITTY_BASE_URL is not set, so there is nothing to call."
             exit 0
           fi
+          base="${KITTY_BASE_URL%/}"
           # A sleeping free instance can take about a minute to wake.
-          curl -fsS --max-time 120 --retry 2 --retry-delay 10 \
-            "${KITTY_BASE_URL%/}/api/health"
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::notice::CRON_SECRET is not set, so this calls /api/health instead of the tick."
+            curl -fsS --max-time 120 --retry 2 --retry-delay 10 "$base/api/health"
+          else
+            curl -fsS --max-time 120 --retry 2 --retry-delay 10 -X POST \
+              -H "Authorization: Bearer $CRON_SECRET" "$base/api/internal/tick"
+          fi
           echo

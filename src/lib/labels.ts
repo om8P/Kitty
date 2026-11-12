@@ -49,6 +49,13 @@ export function aiLabel(purchase: Pick<PurchaseView, "aiDecision" | "status">): 
 
 /** One plain sentence saying why a purchase is where it is. */
 export function purchaseExplanation(purchase: PurchaseView): string {
+  const base = baseExplanation(purchase);
+  if (!purchase.needsAttention) return base;
+  const flag = "PayPal's record disagrees with Kitty's ledger, so nothing more moves until it's checked.";
+  return base ? `${flag} ${base}` : flag;
+}
+
+function baseExplanation(purchase: PurchaseView): string {
   if (purchase.status === "awaiting_approval") {
     const why = purchase.approvalReason ?? "Needs a decision";
     return purchase.aiReason && purchase.aiDecision !== "allow" ? `${why}: ${purchase.aiReason}` : `${why}.`;

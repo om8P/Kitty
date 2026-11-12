@@ -4,12 +4,14 @@
  * match `src/db/schema.ts`. Runs on the Docker Postgres.
  */
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { getTableConfig, PgTable } from "drizzle-orm/pg-core";
 import { Pool } from "pg";
 import { describe, expect, it, onTestFinished } from "vitest";
 import { STORES } from "@/domain/stores";
 import { MVP_SCHEMA_STATEMENTS } from "./fixtures/mvp-schema";
-import { runMigrations } from "./migrate";
+import { MIGRATIONS_FOLDER, runMigrations } from "./migrate";
 import * as schema from "./schema";
 import { TEST_SCHEMA_PREFIX, testDatabaseUrl } from "./testing-config";
 import { openTestDatabase } from "./testing";
@@ -106,7 +108,10 @@ describe("migrations", () => {
     expect(await catalog(pool, name)).toEqual(first);
 
     const applied = await pool.query(`SELECT count(*)::int AS n FROM __drizzle_migrations`);
-    expect(applied.rows[0].n).toBe(3);
+    const journal = JSON.parse(readFileSync(path.join(MIGRATIONS_FOLDER, "meta", "_journal.json"), "utf8")) as {
+      entries: unknown[];
+    };
+    expect(applied.rows[0].n).toBe(journal.entries.length);
   });
 
   it("upgrade a database the MVP made, keeping every row, to the same schema as from empty", async () => {

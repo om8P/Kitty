@@ -101,11 +101,7 @@ export async function startAgentRun(
   if (!member) throw new DomainError("conflict", "This pool has no shopping agent.");
 
   // A run whose process died would otherwise block new runs forever.
-  await db.query(
-    `UPDATE agent_runs SET status = 'failed', error = 'The run stopped unexpectedly.', finished_at = now()
-     WHERE member_id = $1 AND status = 'running' AND heartbeat_at < now() - interval '3 minutes'`,
-    [member.id],
-  );
+  await failStaleAgentRuns(db, { memberId: member.id });
   try {
     const [run] = await db.query<AgentRunRow>(
       "INSERT INTO agent_runs (id, pool_id, member_id, task, status) VALUES ($1, $2, $3, $4, 'running') RETURNING *",
@@ -115,6 +111,25 @@ export async function startAgentRun(
   } catch {
     throw new DomainError("conflict", "The agent is already shopping. Wait for it to finish.");
   }
+}
+
+/**
+ * Ends runs whose process died: no heartbeat for 3 minutes. Purchases they
+ * already made stand on their own states (architecture 5.7). Starting a run
+ * calls this for its agent, and the tick for every agent (S41a).
+ */
+export async function failStaleAgentRuns(
+  db: Database,
+  options: { memberId?: string; now?: Date } = {},
+): Promise<number> {
+  const failed = await db.query<{ id: string }>(
+    `UPDATE agent_runs SET status = 'failed', error = 'The run stopped unexpectedly.', finished_at = now()
+     WHERE status = 'running' AND heartbeat_at < $1::timestamptz - interval '3 minutes'
+       AND ($2::text IS NULL OR member_id = $2)
+     RETURNING id`,
+    [options.now ?? new Date(), options.memberId ?? null],
+  );
+  return failed.length;
 }
 
 /** Runs the loop to the end. Never throws: every failure ends the run with a plain message. */

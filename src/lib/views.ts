@@ -29,6 +29,8 @@ export type MemberView = {
   kind: "person" | "agent";
   userId: string | null;
   label: string;
+  /** False once the owner removes them. They can't spend, and what they spent stays. */
+  active: boolean;
   limitCents: number;
   usedCents: number;
   remainingCents: number;
@@ -51,6 +53,8 @@ export type PurchaseView = {
   aiDecision: "allow" | "flag" | "block" | "unavailable" | null;
   aiReason: string | null;
   approvalReason: string | null;
+  /** PayPal reported something that disagrees with the ledger. Nothing moves until it's checked. */
+  needsAttention: boolean;
   createdAt: string;
 };
 
@@ -126,6 +130,7 @@ export function toMemberView(member: MemberRow): MemberView {
     kind: member.kind,
     userId: member.user_id,
     label: member.label,
+    active: member.active,
     limitCents: member.limit_cents,
     usedCents: used,
     remainingCents: Math.max(member.limit_cents - used, 0),
@@ -151,6 +156,7 @@ export function toPurchaseView(purchase: PurchaseRow, members: MemberRow[]): Pur
     aiDecision: purchase.ai_decision,
     aiReason: purchase.ai_reason,
     approvalReason: purchase.approval_reason,
+    needsAttention: purchase.needs_attention,
     createdAt: iso(purchase.created_at),
   };
 }

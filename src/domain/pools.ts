@@ -121,7 +121,10 @@ export async function confirmPool(deps: PoolDeps, input: { orderId: string; hous
   if (!pool || pool.household_id !== input.householdId) {
     throw new DomainError("not_found", "We couldn't find a pool for that PayPal approval.");
   }
-  if (pool.status !== "awaiting_payer") return pool;
+  // The tick abandons a pool whose approval took too long. If the owner did
+  // approve at PayPal and comes back late, open it anyway, so a real hold is
+  // never left with no pool behind it.
+  if (!CONFIRMABLE.has(pool.status)) return pool;
 
   const result = await rail.confirmPoolPayment({ poolId: pool.id, orderId: input.orderId });
   if (result.outcome !== "succeeded") {
@@ -136,7 +139,7 @@ export async function confirmPool(deps: PoolDeps, input: { orderId: string; hous
   const honorEndsAt = new Date(expiresAt.getTime() - DAYS_AFTER_HONOR * 86_400_000);
   return db.transaction(async (tx) => {
     const [locked] = await tx.query<PoolRow>("SELECT * FROM pools WHERE id = $1 FOR UPDATE", [pool.id]);
-    if (locked.status !== "awaiting_payer") return locked;
+    if (!CONFIRMABLE.has(locked.status)) return locked;
     await tx.query(
       "INSERT INTO ledger_entries (id, pool_id, kind, amount_cents) VALUES ($1, $2, 'authorize', $3)",
       [newId(), pool.id, authorizedCents],
@@ -148,12 +151,28 @@ export async function confirmPool(deps: PoolDeps, input: { orderId: string; hous
       [`auth_${pool.id}`, pool.id, result.data.authorizationId, authorizedCents, honorEndsAt, expiresAt],
     );
     const [active] = await tx.query<PoolRow>(
-      `UPDATE pools SET status = 'active', authorization_id = $2, authorized_cents = $3, hold_expires_at = $4
+      `UPDATE pools SET status = 'active', authorization_id = $2, authorized_cents = $3, hold_expires_at = $4, note = NULL
        WHERE id = $1 RETURNING *`,
       [pool.id, result.data.authorizationId, authorizedCents, expiresAt],
     );
     return active;
   });
+}
+
+const CONFIRMABLE: ReadonlySet<string> = new Set(["awaiting_payer", "abandoned"]);
+/** A pool whose PayPal approval isn't finished by then is abandoned by the tick (architecture 5.1). */
+export const APPROVAL_WINDOW_HOURS = 3;
+
+/** Marks pools the owner never finished approving as abandoned. Returns how many. */
+export async function abandonStalePools(db: Database, now: Date): Promise<number> {
+  const abandoned = await db.query<{ id: string }>(
+    `UPDATE pools SET status = 'abandoned',
+       note = 'The PayPal approval wasn''t finished within ${APPROVAL_WINDOW_HOURS} hours, so this pool never opened.'
+     WHERE status IN ('draft', 'awaiting_payer') AND created_at < $1::timestamptz - interval '${APPROVAL_WINDOW_HOURS} hours'
+     RETURNING id`,
+    [now],
+  );
+  return abandoned.length;
 }
 
 export async function abandonPool(db: Database, input: { orderId: string; householdId: string }): Promise<void> {
@@ -218,7 +237,8 @@ export async function closePool(deps: PoolDeps, input: { poolId: string; userId:
   );
 }
 
-async function finishClose(db: Database, poolId: string, releasedCents: number, note: string | null): Promise<PoolRow> {
+/** Finishes a pool in `closing`. Safe to call twice: a pool already closed is returned unchanged. */
+export async function finishClose(db: Database, poolId: string, releasedCents: number, note: string | null): Promise<PoolRow> {
   return db.transaction(async (tx) => {
     const [pool] = await tx.query<PoolRow>("SELECT * FROM pools WHERE id = $1 FOR UPDATE", [poolId]);
     if (pool.status !== "closing") return pool;

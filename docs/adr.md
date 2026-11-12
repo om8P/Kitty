@@ -388,6 +388,13 @@ Amend the architecture to match the code. The model seam is one `Model` interfac
 #### Risks
 - None to money. The `authorize` entry records the approved amount and moves no counter.
 
+### Note (N4, 2026-11-12)
+
+The owner settled two more differences the same way, keeping the code and amending the arch:
+
+- **Member status is the `active` flag.** Arch 6 listed a member `status`. `pool_members.active` already does that job: removing a member sets it false, the row and its counters stay, and the `member_inactive` hard rule stops new purchases and any approval of waiting ones. A status column would have added a migration for the same behavior.
+- **Channel3 products map to a store by category.** Arch 3 said the offer's `domain` maps to a Kitty store. Kitty's stores are its own demo names, so no retailer domain matches one. The adapter maps the product's category instead (`storeForCategory` in `src/adapters/catalog/catalog.ts`), and anything unmatched goes to "Everything Else".
+
 ---
 
 ## ADR-0010: Drizzle owns the schema and migrations, and domain SQL stays behind the transaction port

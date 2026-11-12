@@ -22,6 +22,31 @@ export type RailResult<T> =
   | { outcome: "failed" | "unsupported"; code: string; message: string }
   | { outcome: "unknown"; reason: string };
 
+/**
+ * A verified payment event, with no provider field names. `purchaseId` comes
+ * from the invoice ID Kitty sends on every capture.
+ */
+export type PaymentEvent = {
+  eventId: string;
+  kind:
+    | "capture_completed"
+    | "capture_declined"
+    | "capture_denied"
+    | "capture_refunded"
+    | "authorization_created"
+    | "authorization_voided";
+  /** The provider's own event type, kept for the record. */
+  type: string;
+  purchaseId: string | null;
+  captureId: string | null;
+  refundId: string | null;
+  authorizationId: string | null;
+  amountCents: number | null;
+};
+
+/** Read from an incoming request, for example `request.headers`. */
+export type HeaderSource = { get(name: string): string | null };
+
 export interface PaymentRail {
   /**
    * `unconfigured` means no PayPal keys are set: every call fails and no pool
@@ -29,6 +54,8 @@ export interface PaymentRail {
    * app never uses.
    */
   readonly name: "paypal" | "unconfigured" | "test";
+  /** False for a rail that charges each purchase on its own and holds no money (architecture 3). */
+  readonly holdsRealFunds: boolean;
   createPoolPayment(input: {
     poolId: string;
     amountCents: number;
@@ -46,6 +73,18 @@ export interface PaymentRail {
   }): Promise<RailResult<{ captureId: string }>>;
   refund(input: { purchaseId: string; captureId: string }): Promise<RailResult<{ refundId: string }>>;
   releaseHold(input: { authorizationId: string }): Promise<RailResult<Record<string, never>>>;
+  /**
+   * Checks a webhook's signature on the raw body exactly as received. On
+   * success, `event` is null for a verified event Kitty has no use for.
+   */
+  verifyWebhookSignature(input: {
+    rawBody: string;
+    headers: HeaderSource;
+  }): Promise<RailResult<{ event: PaymentEvent | null }>>;
+  /** Reads one capture. Used when an amount disagrees (architecture 7.2). */
+  getCapture(input: { captureId: string }): Promise<
+    RailResult<{ captureId: string; status: string; amountCents: number | null; purchaseId: string | null }>
+  >;
 }
 
 export type ReviewFacts = {

@@ -107,12 +107,12 @@ Database tests need `docker compose up -d db` first. From step M2 on, the race t
 | S19 | Drizzle schema, migrations and the missing tables | Agent | M1, M2 | done | D | N2 |
 | S20 | Ledger module | Agent | M2 | in-progress | P | I1 |
 | S21 | Hard rules | Agent | S19 | done | |  |
-| S22 | Payment rail seam | Agent | S08 | in-progress | D | N4 |
+| S22 | Payment rail seam | Agent | S08 | done | D | N4 |
 | S23 | Demo access and owner guard | Agent | S19 | done | |  |
 | S24 | Create and approve pools | Agent + You | S23 | done | D | N3 |
-| S25 | Members and rules | Agent | S19, S23, S24 | in-progress | D | N4 |
+| S25 | Members and rules | Agent | S19, S23, S24 | done | D | N4 |
 | S26 | Catalog seam and marketplace | Agent | S19, S23 | done | |  |
-| S27 | Channel3 adapter | Agent | S11a, S26 | in-progress | D | N4 |
+| S27 | Channel3 adapter | Agent | S11a, S26 | done | D | N4 |
 | S28 | Model seam and Groq adapter | Agent | S10, S19 | done | D | N2 |
 | S29 | AI purchase reviewer | Agent | S28 | done | |  |
 | S29a | Strict review schema | Agent | S10, S29 | done | D | N2 |
@@ -124,11 +124,11 @@ Database tests need `docker compose up -d db` first. From step M2 on, the race t
 | S35 | Agent runner | Agent | S28, S31 | done | |  |
 | S36 | Agent run screens | Agent + You | S24, S34, S35 | done | D | N3 |
 | S37 | Close and release | Agent + You | S24, S31 | done | D | N3 |
-| S38 | Webhook intake | Agent | S07, S19, S24, S31, S37 | pending | D | N4 |
+| S38 | Webhook intake | Agent | S07, S19, S24, S31, S37 | done | D | N4 |
 | S39 | Labeled AI test set | Agent + You | S29, S35 | pending | P | I1 |
 | S40 | **Gate:** milestone 3 scenarios | Agent + You | M2, M4, S27, S32, S34, S36, S37, S38, S41a | pending | D | N5 |
 | **Phase D: Full-term pools (PRD milestone 4)** | | | | | | |
-| S41a | Tick endpoint and purchase recovery | Agent | M2, S38 | pending | D | N4 |
+| S41a | Tick endpoint and purchase recovery | Agent | M2, S38 | done | D | N4 |
 | S41b | Remaining tick jobs | Agent | S41a | pending | P | I2 |
 | S42 | Pool term expiry | Agent | S41b | pending | P | I2 |
 | S43 | Refunds | Agent + You | S41a | in-progress | P | I2 |
@@ -908,3 +908,8 @@ Every change gets one line in the Change log.
 | 2026-11-12 | S24's last item (the tick marks never-approved pools `abandoned`) stays with S41a (N4), and S37's scheduled retries of a stuck `closing` pool stay with S41b (I2). S24 now writes the pool's `authorizations` row on approval, and a confirmed void marks it `voided` | Those items were already owned by the tick steps, and the rest of each step passed in M4 |
 | 2026-11-12 | N3 fixed two defects with tests: PayPal's `MAX_CAPTURE_AMOUNT_EXCEEDED` refusal now counts as a definite failure, and `CATALOG_PROVIDER=seeded` now selects the seeded catalog | Found in S06a and before M4. Without the second fix the app would have spent Channel3 credits |
 | 2026-11-12 | M4 found that a four-item agent run reaches Groq's free per-minute token limit and stops safely after three purchases. Pacing between agent turns is a candidate for S49 (N6) | Free-limit behavior, not a defect. Recorded in `docs/test-results.md` |
+| 2026-11-12 | S22, S25, S27, S38 and S41a `done` (session N4). S22's `refreshHold` and `getPoolPaymentState` stay with S44 and S45, as their steps already say | Members are editable under the pool lock, webhooks are verified and safe to repeat, the tick recovers stuck work, and Channel3 stops at exactly 900 searches a month |
+| 2026-11-12 | The owner kept `pool_members.active` as the member status and category-based store mapping for Channel3. Arch 3 and 6 are amended, with a note under ADR-0009, and the open M5 row is closed | Both already worked, and the arch's versions would have added a migration or dropped most Channel3 results for no change in behavior |
+| 2026-11-12 | S24's last item is done in S41a: the tick marks pools never approved within 3 hours `abandoned`, and a late return from PayPal still opens the pool | A real hold must never be left with no pool behind it |
+| 2026-11-12 | The tick's `capture_unknown` replay stops after the 1-hour window S05 proved and flags the purchase `needs_attention`, with the money still reserved. A webhook that contradicts the ledger also sets `needs_attention`. Pausing the pool waits for S45 (I2) | Arch 7.2: after the window, stop sending and read PayPal's record. Reconciliation is S45's |
+| 2026-11-12 | `webhook_events` stores Kitty's own event shape, not PayPal's raw body, and events Kitty doesn't use aren't stored | Keeps PayPal field names inside the adapter. Unused events have nothing to apply |

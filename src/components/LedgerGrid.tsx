@@ -14,7 +14,7 @@ import { useCallback, useId, useMemo, useRef, useState } from "react";
 import { formatUsd } from "@/domain/money";
 import { STATUS_LABELS, aiLabel, formatTime, ruleLabel } from "@/lib/labels";
 import type { PurchaseView } from "@/lib/views";
-import { StatusBadge } from "./StatusBadge";
+import { StatusBadge, ToneBadge } from "./StatusBadge";
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
@@ -124,7 +124,18 @@ export function LedgerGrid({ purchases, busyId, readOnly, onAction }: Props) {
         width: 186,
         valueGetter: (params) => (params.data ? STATUS_LABELS[params.data.status].label : ""),
         cellRenderer: (params: ICellRendererParams<PurchaseView>) =>
-          params.data ? <StatusBadge status={params.data.status} /> : null,
+          params.data ? (
+            <span className="row" style={{ gap: "var(--space-1)" }}>
+              <StatusBadge status={params.data.status} />
+              {params.data.needsAttention && (
+                <ToneBadge tone="stop">
+                  <span title="PayPal's record disagrees with Kitty's ledger. Nothing more moves until it's checked.">
+                    Needs checking
+                  </span>
+                </ToneBadge>
+              )}
+            </span>
+          ) : null,
       },
       {
         colId: "decision",
