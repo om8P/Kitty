@@ -47,8 +47,8 @@ export function PoolPreview({ preview, termLabel, paypalReady }: { preview: Prev
                 : spender.thresholdCents === null
                   ? "Approval amount not set yet."
                   : spender.thresholdCents === 0
-                    ? "You approve every purchase."
-                    : `You approve purchases over ${formatUsd(spender.thresholdCents)}.`}
+                    ? "Asks you before every purchase."
+                    : `Asks you above ${formatUsd(spender.thresholdCents)}.`}
             </p>
           </li>
         ))}

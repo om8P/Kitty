@@ -23,12 +23,16 @@ export function Shop({ initial, initialProducts, ownerName }: Props) {
   const [searchError, setSearchError] = useState<string | null>(null);
   const [buyingId, setBuyingId] = useState<string | null>(null);
   const [result, setResult] = useState<{ purchase?: PurchaseView; error?: string } | null>(null);
+  const [stale, setStale] = useState(false);
 
   const refresh = useCallback(async (signal?: AbortSignal) => {
     try {
       setShop(await getJson<ShopView>("/api/shop", signal));
-    } catch {
-      // The next poll tries again. The last known state stays on screen.
+      setStale(false);
+    } catch (failure) {
+      // The next poll tries again. The last known state stays on screen, marked as possibly out of date.
+      if (failure instanceof DOMException) return;
+      setStale(true);
     }
   }, []);
 
@@ -100,6 +104,13 @@ export function Shop({ initial, initialProducts, ownerName }: Props) {
 
   return (
     <div className="stack stack--loose">
+      {stale && (
+        <div className="notice notice--warn" role="status">
+          <span>
+            <strong>This page may be out of date.</strong> Kitty couldn&rsquo;t refresh your limit. It keeps trying.
+          </span>
+        </div>
+      )}
       <section className="card" aria-labelledby="limit-title">
         <p className="muted small">{pool.goal}</p>
         <h1 id="limit-title" className="visually-hidden">
