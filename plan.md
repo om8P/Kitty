@@ -141,14 +141,14 @@ Database tests need `docker compose up -d db` first. From step M2 on, the race t
 | S47a | **Gate, part 1:** start a full-term pool | Agent + You | S48 | done | D | N5 |
 | S47b | **Gate, part 2:** finish the full-term pool | Agent + You | S47a, S44 | pending | P | I3 |
 | **Phase E: Public demo (PRD milestone 5)** | | | | | | |
-| S49 | Judge access | Agent + You | S48 | pending | D | N6 |
-| S50 | Polish the core screens | Agent | S18, S47a | pending | D | N6 |
-| S51 | Security review | Agent | S49, S50 | pending | D | N6 |
+| S49 | Judge access | Agent + You | S48 | done | D | N6 |
+| S50 | Polish the core screens | Agent | S18, S47a | done | D | N6 |
+| S51 | Security review | Agent | S49, S50 | done | D | N6 |
 | S52 | README and open-source license check | Agent | S15a, S49 | pending | D | N7 |
 | S53 | Clean-account end-to-end run | Agent + You | S51, S52 | pending | D | N7 |
 | S53a | Start the demo pool | You | S53 | pending | D | N7 |
-| S54 | Demo video | You | S53a | pending | D | N8 |
-| S55 | Hackathon submission | You | S15a, S54 | pending | D | N8 |
+| S54 | Demo video | You | S53a | done | D | N8 |
+| S55 | Hackathon submission | You | S15a, S54 | done | D | N8 |
 | **Phase F: Nice-to-have extras** | | | | | | |
 | E1 | Gemini adapter | Agent | S55 | pending | P | I5 |
 | E2 | Ledger CSV export | Agent | S55 | pending | P | I5 |
@@ -916,3 +916,8 @@ Every change gets one line in the Change log.
 | 2026-11-12 | S40, S48 and S47a `done` (session N5). S40's scenarios are scripted in `scripts/gate/s40-scenarios.ts`, and every result is in `docs/test-results.md` | The gate passed on the real sandbox and live Groq, the app runs on Render and Supabase with no card, and the full-term pool started on 2026-11-12 at 08:34 UTC |
 | 2026-11-12 | S48 found that GitHub runs the 5-minute schedule only every 6 to 7 hours, so the free Render instance sleeps between runs and the tick runs rarely. Keeping it awake (for example a free outside pinger on `/api/health`) is for the owner to decide before N6's judge access | The S12 sleep check, now measured. A new free service account needs the owner's approval |
 | 2026-11-12 | S47b (I3) can start after 2026-11-15 08:34 UTC, when the S47a pool is 3 days old, as well as after 2026-11-13T07:46Z for S06b | Its honor period starts at the hosted approval |
+| 2026-11-12 | S54 and S55 `done`: the owner submitted on Devpost before the deadline, ahead of N6 to N8. The entry is now frozen, but judges test the hosted app until Dec 15, so later sessions must keep it working | The owner's word in session N6 |
+| 2026-11-12 | S49, S50 and S51 `done` (session N6). Per-household caps of 40 AI reviews and 5 agent runs a day and an `AI_ENABLED` switch sit beside the app-wide cap. Agent turns may wait a full minute for Groq's token window, so a four-item run paces itself. `docs/judge-notes.template.md` and `scripts/metrics/delegation.ts` (the PRD's delegation follow-through) are added | S49's arch Security items, and M4's pacing finding |
+| 2026-11-12 | The owner chose a free outside pinger to keep the Render instance awake: a cron-job.org job posting to the tick every 5 minutes, or an UptimeRobot monitor on `/api/health`. Recorded in `docs/spike/S12.md` and the README. Setting it up is the owner's | S48 measured that GitHub runs the schedule only every 6 to 7 hours |
+| 2026-11-12 | Added to S50 at the owner's request: Create a pool shows a live preview of the amount to hold and each spender's limit against it, sticky beside the form on wide screens. The shop now says when it couldn't refresh | The owner asked to see the balance while making a pool |
+| 2026-11-12 | S51 found no high-severity issue, and the git history holds no secret. Two medium findings were fixed in the session: other sites can no longer frame Kitty, and new demo households are capped at 300 a day. The rest were reported to the owner in chat | S51 reports in chat, not in the public repo |
