@@ -51,6 +51,7 @@ The app applies its database migrations on startup.
 | `SESSION_SECRET` | Recommended | Any long random string |
 | `DEMO_ACCESS_CODE` | No | If set, visitors must enter this code to start the demo |
 | `CRON_SECRET` | No | Protects the `/api/internal/tick` background job |
+| `AI_ENABLED` | No | `off` switches AI off: every purchase then goes to the owner for approval, and the agent won't start. On when empty |
 | `PAYPAL_WEBHOOK_ID` | No | Only needed to receive PayPal webhooks (needs a public HTTPS URL) |
 | `APP_URL` | When hosted | The public base URL, used for PayPal's return links |
 | `DATABASE_CA_CERT` | When hosted | The hosted database's CA certificate (PEM), for verified TLS |
@@ -62,6 +63,14 @@ The app applies its database migrations on startup.
 3. On PayPal, log in with a **US sandbox Personal** account (developer.paypal.com → Testing Tools → Sandbox Accounts) and approve. A Business account can't pay itself.
 4. Switch to **Sam** in the header and shop: an allowed item is paid, headphones are blocked by the store rule, and the "Collector's mystery figure" (its listing hides a prompt injection) is blocked by the AI.
 5. Switch back to **Alex**: approve the waiting purchase, send the agent shopping, check the ledger, refund, then **Close pool**.
+
+### AI limits
+
+Kitty stays inside Groq's free plan: at most 800 AI requests and 150,000 tokens a day across the app, and 40 purchase reviews and 5 agent runs a day per household. Past a limit, nothing is blocked by it alone: purchases go to the owner for approval.
+
+### Hosting
+
+The hosted demo runs on Render's free plan with Supabase's free Postgres ([`docs/spike/S12.md`](docs/spike/S12.md)). Render sleeps after 15 idle minutes, so a free outside scheduler (for example cron-job.org) posts to `/api/internal/tick` every 5 minutes with `Authorization: Bearer <CRON_SECRET>`, which keeps it awake and runs the background jobs on time.
 
 ## Development
 

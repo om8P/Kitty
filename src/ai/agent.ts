@@ -8,7 +8,7 @@
  */
 import { z } from "zod";
 import { formatUsd } from "@/domain/money";
-import type { Catalog, Database } from "@/domain/ports";
+import type { AiQuota, Catalog, Database } from "@/domain/ports";
 import { SELECT_MEMBERS } from "@/domain/stores";
 import { submitPurchase, type PurchaseDeps } from "@/domain/purchases";
 import { memberRemaining } from "@/domain/rules";
@@ -39,6 +39,8 @@ export type AgentDeps = {
 const MAX_TURNS = 8;
 /** A run stops after this long. A stale run is also reclaimed after 3 minutes without a heartbeat. */
 export const MAX_RUN_MS = 3 * 60_000;
+/** Groq's free token window is one minute (S10), so a turn waits at most that long for it. */
+const AGENT_TURN_MAX_WAIT_MS = 61_000;
 const MAX_PURCHASE_REQUESTS = 6;
 const MAX_TASK_LENGTH = 300;
 
@@ -85,6 +87,7 @@ const purchaseArgs = z.strictObject({
 export async function startAgentRun(
   db: Database,
   input: { poolId: string; userId: string; task: string },
+  quota?: AiQuota,
 ): Promise<AgentRunRow> {
   const task = cleanText(input.task, MAX_TASK_LENGTH);
   if (task.length < 5) throw new DomainError("invalid", "Tell the agent what to shop for.");
@@ -102,6 +105,19 @@ export async function startAgentRun(
 
   // A run whose process died would otherwise block new runs forever.
   await failStaleAgentRuns(db, { memberId: member.id });
+  const [open] = await db.query<{ id: string }>(
+    "SELECT id FROM agent_runs WHERE member_id = $1 AND status = 'running' LIMIT 1",
+    [member.id],
+  );
+  if (open) throw new DomainError("conflict", "The agent is already shopping. Wait for it to finish.");
+
+  const allowance = quota ? await quota.takeAgentRun(pool.household_id) : "ok";
+  if (allowance === "off") {
+    throw new DomainError("conflict", "AI is switched off right now, so the agent can't shop. People can still buy.");
+  }
+  if (allowance === "limit") {
+    throw new DomainError("conflict", "This household has used today's agent runs. Try again tomorrow.");
+  }
   try {
     const [run] = await db.query<AgentRunRow>(
       "INSERT INTO agent_runs (id, pool_id, member_id, task, status) VALUES ($1, $2, $3, $4, 'running') RETURNING *",
@@ -159,7 +175,8 @@ export async function runAgent(deps: AgentDeps, runId: string): Promise<void> {
     let purchaseRequests = 0;
 
     for (let turn = 0; turn < MAX_TURNS; turn++) {
-      if (now() >= deadline) {
+      const turnStart = now();
+      if (turnStart >= deadline) {
         return finish(
           db,
           runId,
@@ -169,7 +186,9 @@ export async function runAgent(deps: AgentDeps, runId: string): Promise<void> {
         );
       }
       // Low reasoning effort was enough for choosing tools in S10, and keeps turns small.
-      const reply = await model.chat({ messages, tools: TOOLS, maxTokens: 1500, reasoningEffort: "low" });
+      // A turn may wait up to a full minute for Groq's token window, within the run's time cap.
+      const maxWaitMs = Math.max(0, Math.min(AGENT_TURN_MAX_WAIT_MS, deadline - turnStart));
+      const reply = await model.chat({ messages, tools: TOOLS, maxTokens: 1500, reasoningEffort: "low", maxWaitMs });
       if (!reply.ok) {
         const why =
           reply.reason === "not_configured"

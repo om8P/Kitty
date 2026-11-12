@@ -41,6 +41,13 @@ export type ChatRequest = {
   /** Strict JSON-schema output. Groq can't combine it with tools. */
   jsonSchema?: { name: string; schema: Record<string, unknown> };
   maxTokens?: number;
+  /**
+   * The longest this call may wait for Groq's per-minute token window to refill
+   * before failing as `rate_limited`. Defaults to 20 seconds, so a purchase
+   * review never keeps a shopper waiting long. Agent turns wait up to a full
+   * window, so a run paces itself instead of stopping (S49, M4 finding).
+   */
+  maxWaitMs?: number;
   /** Leave unset for the model's default. Agent turns use `low`, reviews the default (S10). */
   reasoningEffort?: "low" | "medium" | "high";
 };
@@ -147,9 +154,10 @@ export function createGroqModel(
 
     // Pace: if the call wouldn't fit in this minute's window, wait for it to refill.
     const estimate = estimateTokens(request) + maxTokens + ESTIMATE_MARGIN_TOKENS;
+    const maxWait = request.maxWaitMs ?? MAX_WAIT_MS;
     if (window && window.remaining < estimate && window.resetsAt > now()) {
       const wait = window.resetsAt - now();
-      if (wait > MAX_WAIT_MS) return { ok: false, reason: "rate_limited" };
+      if (wait > maxWait) return { ok: false, reason: "rate_limited" };
       await sleep(wait);
       window = null;
     }
@@ -164,7 +172,7 @@ export function createGroqModel(
         if (error instanceof Groq.RateLimitError) {
           window = readWindow(error.headers, now());
           const wait = retryWaitMs(error.headers);
-          if (attempt === 0 && wait !== null && wait <= MAX_WAIT_MS) {
+          if (attempt === 0 && wait !== null && wait <= maxWait) {
             await sleep(wait);
             window = null;
             continue;

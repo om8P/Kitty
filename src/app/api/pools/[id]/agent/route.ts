@@ -22,7 +22,11 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       throw new DomainError("conflict", "The agent needs a GROQ_API_KEY to run. Add one and restart Kitty.");
     }
 
-    const run = await startAgentRun(container.db, { poolId: pool.id, userId: session.user.id, task: body.data.task });
+    const run = await startAgentRun(
+      container.db,
+      { poolId: pool.id, userId: session.user.id, task: body.data.task },
+      container.quota,
+    );
     after(() => runAgent(container.agent, run.id));
     return Response.json({ runId: run.id });
   });
