@@ -1,9 +1,11 @@
 "use client";
 
-import { useId, useRef, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 import { parseDollars } from "@/domain/money";
 import { STORES } from "@/domain/stores";
 import { errorMessage, postJson } from "@/lib/client";
+import { MAX_POOL_CENTS, MIN_POOL_CENTS, poolPreview } from "@/lib/pool-preview";
+import { PoolPreview } from "./PoolPreview";
 
 type MemberDraft = {
   kind: "person" | "agent";
@@ -49,6 +51,8 @@ export function NewPoolForm({ teenName, paypalReady }: { teenName: string; paypa
   ]);
   const [errors, setErrors] = useState<Errors>({});
   const [busy, setBusy] = useState(false);
+  const preview = useMemo(() => poolPreview({ amount, members }), [amount, members]);
+  const termLabel = TERMS.find((term) => term.days === termDays)?.label ?? `${termDays} days`;
 
   function updateMember(index: number, patch: Partial<MemberDraft>) {
     setMembers((current) => current.map((member, at) => (at === index ? { ...member, ...patch } : member)));
@@ -58,7 +62,7 @@ export function NewPoolForm({ teenName, paypalReady }: { teenName: string; paypa
     const found: Errors = {};
     if (goal.trim().length < 3) found.goal = "Describe what this pool is for, for example Weekly groceries.";
     const amountCents = parseDollars(amount);
-    if (amountCents === null || amountCents < 500 || amountCents > 50000) {
+    if (amountCents === null || amountCents < MIN_POOL_CENTS || amountCents > MAX_POOL_CENTS) {
       found.amount = "Enter an amount from $5 to $500.";
     }
     members.forEach((member, index) => {
@@ -105,7 +109,7 @@ export function NewPoolForm({ teenName, paypalReady }: { teenName: string; paypa
   }
 
   return (
-    <form ref={formRef} className="stack stack--loose" onSubmit={submit} noValidate>
+    <form ref={formRef} className="create-layout" onSubmit={submit} noValidate>
       <section className="card stack" aria-labelledby={`${id}-pool`}>
         <h2 id={`${id}-pool`}>The pool</h2>
         <div className="field">
@@ -153,6 +157,10 @@ export function NewPoolForm({ teenName, paypalReady }: { teenName: string; paypa
           </div>
         </div>
       </section>
+
+      <aside className="create-layout__aside">
+        <PoolPreview preview={preview} termLabel={termLabel} paypalReady={paypalReady} />
+      </aside>
 
       <section className="stack" aria-labelledby={`${id}-who`}>
         <h2 id={`${id}-who`}>Who can spend</h2>
