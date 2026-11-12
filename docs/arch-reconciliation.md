@@ -34,7 +34,7 @@ Run on 2026-11-11, at the end of N1, against `main` plus the N1 branch (`session
 | Difference | Resolution |
 |---|---|
 | Agent runs cap turns and purchase requests but have no wall-clock cap (5.7) | Fixed in N2 (S28): 3 minutes |
-| No `honor_ends_at`, so a hold past its honor period gets no warning (5.1, 5.2) | The `authorizations` table with `honor_ends_at` was added in N2 (S19), backfilled for existing pools. New pools write their row in S24 (N3), and the warning comes with S44 (I3) |
+| No `honor_ends_at`, so a hold past its honor period gets no warning (5.1, 5.2) | The `authorizations` table with `honor_ends_at` was added in N2 (S19), backfilled for existing pools. New pools write their row since N3 (S24), and the warning comes with S44 (I3) |
 | No hold refresh (5.5) | Fixed by S44 (I3) |
 | Pools the owner never approves are not marked `abandoned` by a timeout (5.1) | Fixed by S41a (N4) |
 | Waiting approvals don't expire after a set time, only when the pool closes (5.3) | Fixed by S41a (N4), with `approval_expires_at` from S19 |
@@ -47,7 +47,7 @@ Run on 2026-11-11, at the end of N1, against `main` plus the N1 branch (`session
 | Difference | Resolution |
 |---|---|
 | Allowed stores in a JSONB column, not `stores` and `member_stores` | Fixed in N2 (S19), with the existing data copied over in order |
-| No `authorizations` table. The current hold is a column on `pools` | Fixed in N2 (S19). `pools.authorization_id` stays as the current hold, which arch 6 also lists. S24 (N3) and S44 (I3) write new rows |
+| No `authorizations` table. The current hold is a column on `pools` | Fixed in N2 (S19). `pools.authorization_id` stays as the current hold, which arch 6 also lists. S24 writes the first row since N3, and S44 (I3) writes reauthorizations |
 | No `refunded_cents` on `pool_members`, and no `needs_attention`, `approval_expires_at` or `decided_by` on `purchases` | Fixed in N2 (S19). Approve and deny write `decided_by`. The others get their writers in S43, S38 and S41a |
 | No `webhook_events` table | Fixed by S38 (N4) |
 | `usage_counters` has no scope (app or household) | Fixed by S49 (N6) |

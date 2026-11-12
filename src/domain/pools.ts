@@ -23,6 +23,8 @@ export const MIN_POOL_CENTS = 5_00;
 export const MAX_TERM_DAYS = 28;
 /** PayPal honors an authorization for 29 days. Used when PayPal's response gives no expiry. */
 const HOLD_DAYS = 29;
+/** A capture is honored for the first 3 days of the 29, so the honor period ends 26 days before expiry (arch 5.1). */
+const DAYS_AFTER_HONOR = 26;
 
 export type NewMember = {
   kind: "person" | "agent";
@@ -131,12 +133,19 @@ export async function confirmPool(deps: PoolDeps, input: { orderId: string; hous
 
   const authorizedCents = result.data.authorizedCents ?? pool.requested_cents;
   const expiresAt = result.data.expiresAt ?? new Date(now.getTime() + HOLD_DAYS * 86_400_000);
+  const honorEndsAt = new Date(expiresAt.getTime() - DAYS_AFTER_HONOR * 86_400_000);
   return db.transaction(async (tx) => {
     const [locked] = await tx.query<PoolRow>("SELECT * FROM pools WHERE id = $1 FOR UPDATE", [pool.id]);
     if (locked.status !== "awaiting_payer") return locked;
     await tx.query(
       "INSERT INTO ledger_entries (id, pool_id, kind, amount_cents) VALUES ($1, $2, 'authorize', $3)",
       [newId(), pool.id, authorizedCents],
+    );
+    // The same id the N2 backfill gave existing pools, so each pool's first hold has one row.
+    await tx.query(
+      `INSERT INTO authorizations (id, pool_id, paypal_authorization_id, amount_cents, honor_ends_at, expires_at, status)
+       VALUES ($1, $2, $3, $4, $5, $6, 'active')`,
+      [`auth_${pool.id}`, pool.id, result.data.authorizationId, authorizedCents, honorEndsAt, expiresAt],
     );
     const [active] = await tx.query<PoolRow>(
       `UPDATE pools SET status = 'active', authorization_id = $2, authorized_cents = $3, hold_expires_at = $4
@@ -219,6 +228,10 @@ async function finishClose(db: Database, poolId: string, releasedCents: number, 
         poolId,
         releasedCents,
       ]);
+      await tx.query(
+        "UPDATE authorizations SET status = 'voided' WHERE pool_id = $1 AND paypal_authorization_id = $2 AND status = 'active'",
+        [poolId, pool.authorization_id],
+      );
     }
     const [closed] = await tx.query<PoolRow>(
       "UPDATE pools SET status = 'closed', released_cents = $2, note = $3, closed_at = now() WHERE id = $1 RETURNING *",
