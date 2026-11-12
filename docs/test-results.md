@@ -77,3 +77,14 @@ Baseline at the time: lint, typecheck and 589 tests pass, including `tests/gate/
 
 **Finding:** GitHub's schedule alone can't keep the free instance awake or run the tick often. A free outside pinger that calls `/api/health` every 10 minutes would keep it awake. That would be a new free service account, so it's the owner's decision (recorded in `plan.md`).
 
+## S47a: full-term pool, part 1
+
+**Started 2026-11-12 at 08:34 UTC on the hosted app.** The owner entered the access code, and the default pool was created from the screen: "Weekly groceries", $150, 4 weeks (ends Dec 10). Sam: $40 limit, asks above $15, Fresh Market and Corner Pharmacy. Shopping agent: $80, asks above $25, Fresh Market. The owner approved it at PayPal as the sandbox buyer and came back to an open pool.
+
+| Purchase | Kitty | PayPal sandbox |
+|---|---|---|
+| Sam: whole milk, $3.89 | "Paid", passed the rules and the AI check | Capture completed, $3.89, webhook delivered (Success) |
+| Sam: bananas, $1.59 | "Paid", Sam's limit left $34.52 | Capture completed, $1.59, webhook delivered (Success) |
+| The hold | $150 held, open | Authorization created, $150, webhook delivered (Success) |
+
+PayPal's sandbox event log lists one webhook delivery status per event for the app, not per URL. The older local ngrok webhook is still registered, so "Success" doesn't by itself name the hosted endpoint. The hosted endpoint's signature check is shown above (it refuses unsigned events), and N3 verified 16 of 16 real signatures on the same code. The pool stays active for S47b (session I3), which can run once its 3-day honor period has passed (after 2026-11-15 08:34 UTC).
