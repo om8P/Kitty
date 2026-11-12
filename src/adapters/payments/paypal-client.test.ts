@@ -270,6 +270,20 @@ describe("PayPal client", () => {
       expect(result).toMatchObject({ outcome: "failed", code: "INSTRUMENT_DECLINED" });
     });
 
+    it("treats a capture over the overage limit as a definite failure (seen in S06a)", async () => {
+      const { client } = setup([paypalError(422, "UNPROCESSABLE_ENTITY", ["MAX_CAPTURE_AMOUNT_EXCEEDED"])]);
+      const result = await client.captureAuthorization({ authorizationId: "AUTH-1", requestId: "r1", amount: usd("30.00") });
+      expect(result).toMatchObject({ outcome: "failed", code: "MAX_CAPTURE_AMOUNT_EXCEEDED", httpStatus: 422 });
+    });
+
+    it("keeps a voided authorization and a fully refunded capture unknown, since a replay can cause them (seen in S06a)", async () => {
+      for (const issue of ["AUTHORIZATION_VOIDED", "CAPTURE_FULLY_REFUNDED"]) {
+        const { client } = setup([paypalError(422, "UNPROCESSABLE_ENTITY", [issue])]);
+        const result = await client.refundCapture({ captureId: "CAP-1", requestId: "r1" });
+        expect(result.outcome).toBe("unknown");
+      }
+    });
+
     it("never fails a 400 or 404 carrying an already-done issue", async () => {
       for (const status of [400, 404]) {
         const { client } = setup([paypalError(status, "INVALID_REQUEST", ["PREVIOUSLY_CAPTURED"])]);

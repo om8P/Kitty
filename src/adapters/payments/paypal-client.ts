@@ -36,6 +36,9 @@ export const UNSUPPORTED_ISSUES: ReadonlySet<string> = new Set([
 export const DEFINITE_FAILURE_ISSUES: ReadonlySet<string> = new Set([
   "INSTRUMENT_DECLINED",
   "TRANSACTION_REFUSED",
+  // Observed in S06a: a capture above PayPal's 115% overage limit. A read of the
+  // order confirmed no capture was made, before and after a refund.
+  "MAX_CAPTURE_AMOUNT_EXCEEDED",
 ]);
 
 /**
