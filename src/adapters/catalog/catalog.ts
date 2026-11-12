@@ -9,7 +9,7 @@
  * never stored or shown.
  */
 import { z } from "zod";
-import type { Catalog, CatalogProduct, Database } from "@/domain/ports";
+import type { Catalog, CatalogProduct, Database, Queryable } from "@/domain/ports";
 import type { StoreName } from "@/domain/stores";
 import type { ProductRow } from "@/domain/types";
 import { SEED_PRODUCTS, searchSeed, type SeedProduct } from "./seed";
@@ -17,7 +17,7 @@ import { SEED_PRODUCTS, searchSeed, type SeedProduct } from "./seed";
 const CHANNEL3_URL = "https://api.trychannel3.com/v1/search";
 const CHANNEL3_TIMEOUT_MS = 12_000;
 /** Channel3 gives 1,000 free searches a month. Stop well before that. */
-const CHANNEL3_MONTHLY_CAP = 900;
+export const CHANNEL3_MONTHLY_CAP = 900;
 const MAX_PRICE_CENTS = 500_00;
 const RESULT_LIMIT = 8;
 
@@ -45,14 +45,17 @@ export function createCatalog(
   }
 
   async function searchChannel3(query: string): Promise<CatalogProduct[]> {
+    // Count the search only while under the cap, in one statement, so search
+    // 901 never reaches Channel3 and a blocked search doesn't inflate the count.
     const period = now().toISOString().slice(0, 7);
-    const [counter] = await db.query<{ count: number }>(
+    const counted = await db.query<{ count: number }>(
       `INSERT INTO usage_counters (kind, period, count) VALUES ('channel3_search', $1, 1)
        ON CONFLICT (kind, period) DO UPDATE SET count = usage_counters.count + 1
+       WHERE usage_counters.count < $2
        RETURNING count`,
-      [period],
+      [period, CHANNEL3_MONTHLY_CAP],
     );
-    if (counter.count > CHANNEL3_MONTHLY_CAP) return [];
+    if (counted.length === 0) return [];
 
     const response = await fetchImpl(CHANNEL3_URL, {
       method: "POST",
@@ -82,15 +85,6 @@ export function createCatalog(
     return products;
   }
 
-  /** Removes Channel3 products nobody bought once they are a day old. */
-  async function purgeOld(): Promise<void> {
-    await db.query(
-      `DELETE FROM products
-       WHERE source = 'channel3' AND fetched_at < now() - interval '24 hours'
-         AND id NOT IN (SELECT product_id FROM purchases)`,
-    );
-  }
-
   return {
     provider: useChannel3 ? "channel3" : "seed",
 
@@ -102,7 +96,7 @@ export function createCatalog(
       let live: CatalogProduct[] = [];
       if (useChannel3) {
         try {
-          await purgeOld();
+          await purgeUnpurchasedChannel3Products(db);
           live = await searchChannel3(query);
         } catch {
           // Any Channel3 problem falls back to the sample catalog.
@@ -118,6 +112,22 @@ export function createCatalog(
       return loadSeedRows(db, SEED_PRODUCTS.filter((product) => product.featured));
     },
   };
+}
+
+/**
+ * Removes Channel3 products nobody bought once they are a day old, because
+ * Channel3's terms forbid keeping its catalog (architecture 3). Products a
+ * purchase points to stay, so the ledger keeps its history. Returns how many
+ * were removed. Searches call it, and the tick schedules it (S41b).
+ */
+export async function purgeUnpurchasedChannel3Products(db: Queryable): Promise<number> {
+  const removed = await db.query<{ id: string }>(
+    `DELETE FROM products
+     WHERE source = 'channel3' AND fetched_at < now() - interval '24 hours'
+       AND id NOT IN (SELECT product_id FROM purchases)
+     RETURNING id`,
+  );
+  return removed.length;
 }
 
 /**
