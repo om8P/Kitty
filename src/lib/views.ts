@@ -53,6 +53,8 @@ export type PurchaseView = {
   aiDecision: "allow" | "flag" | "block" | "unavailable" | null;
   aiReason: string | null;
   approvalReason: string | null;
+  /** PayPal reported something that disagrees with the ledger. Nothing moves until it's checked. */
+  needsAttention: boolean;
   createdAt: string;
 };
 
@@ -154,6 +156,7 @@ export function toPurchaseView(purchase: PurchaseRow, members: MemberRow[]): Pur
     aiDecision: purchase.ai_decision,
     aiReason: purchase.ai_reason,
     approvalReason: purchase.approval_reason,
+    needsAttention: purchase.needs_attention,
     createdAt: iso(purchase.created_at),
   };
 }

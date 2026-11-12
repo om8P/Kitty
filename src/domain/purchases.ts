@@ -194,11 +194,28 @@ export async function refundPurchase(deps: PurchaseDeps, input: { purchaseId: st
   });
 
   const result = await rail.refund({ purchaseId: pending.id, captureId: pending.capture_id as string });
+  return settleRefund(db, pending.id, result);
+}
 
+/**
+ * Records a refund's outcome under the pool lock. A refund sends money back to
+ * the payer and never makes it spendable (architecture 7.3). A webhook may
+ * also confirm a refund made outside Kitty, so `captured` is accepted when
+ * `fromCaptured` is set, for a definite success only.
+ */
+export async function settleRefund(
+  db: Database,
+  purchaseId: string,
+  result: RailResult<{ refundId: string }>,
+  options: { fromCaptured?: boolean } = {},
+): Promise<PurchaseRow> {
   return db.transaction(async (tx) => {
-    await lockPool(tx, pending.pool_id);
-    const [purchase] = await tx.query<PurchaseRow>("SELECT * FROM purchases WHERE id = $1 FOR UPDATE", [pending.id]);
-    if (purchase.status !== "refund_pending") return purchase;
+    const [unlocked] = await tx.query<PurchaseRow>("SELECT * FROM purchases WHERE id = $1", [purchaseId]);
+    if (!unlocked) throw new DomainError("not_found", "That purchase doesn't exist.");
+    await lockPool(tx, unlocked.pool_id);
+    const [purchase] = await tx.query<PurchaseRow>("SELECT * FROM purchases WHERE id = $1 FOR UPDATE", [purchaseId]);
+    const fromCaptured = options.fromCaptured && result.outcome === "succeeded" && purchase.status === "captured";
+    if (purchase.status !== "refund_pending" && !fromCaptured) return purchase;
 
     if (result.outcome === "succeeded") {
       await tx.query("UPDATE pools SET refunded_cents = refunded_cents + $2 WHERE id = $1", [
@@ -300,7 +317,7 @@ async function reserveAndCapture(
  * a capture response, because a replayed response can echo the wrong amount
  * (docs/spike/S05.md).
  */
-async function settleCapture(
+export async function settleCapture(
   db: Database,
   purchaseId: string,
   result: RailResult<{ captureId: string }>,

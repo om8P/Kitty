@@ -218,7 +218,8 @@ export async function closePool(deps: PoolDeps, input: { poolId: string; userId:
   );
 }
 
-async function finishClose(db: Database, poolId: string, releasedCents: number, note: string | null): Promise<PoolRow> {
+/** Finishes a pool in `closing`. Safe to call twice: a pool already closed is returned unchanged. */
+export async function finishClose(db: Database, poolId: string, releasedCents: number, note: string | null): Promise<PoolRow> {
   return db.transaction(async (tx) => {
     const [pool] = await tx.query<PoolRow>("SELECT * FROM pools WHERE id = $1 FOR UPDATE", [poolId]);
     if (pool.status !== "closing") return pool;
