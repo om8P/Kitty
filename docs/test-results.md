@@ -44,3 +44,18 @@ Every capture carries `invoice_id: kitty-{purchase id}`, matching its Kitty purc
   - `MAX_CAPTURE_AMOUNT_EXCEEDED` was classified `unknown` instead of `failed` (S06a).
   - `CATALOG_PROVIDER=seeded`, the plan's spelling, was not recognized, so the app would have used Channel3 whenever its key was set.
 - **Not checked here:** a capture decline (the sandbox can't force one), and the phone layout beyond what the flows needed (S50 and E3).
+
+## S40: milestone 3 scenarios (gate)
+
+**Run on 2026-11-12, session N5, branch `session/N5-gate-deploy`.** `scripts/gate/s40-scenarios.ts` drove the app's own wiring (`getContainer`): the Docker Postgres, the real PayPal sandbox rail and the live Groq reviewer (`openai/gpt-oss-120b`), with the seeded catalog. The owner approved a $40 "Weekly groceries" pool at PayPal as the sandbox buyer. Sam (teen): $40 limit, no rule-based approval, Fresh Market, Corner Pharmacy, Style Street and Gadget Hub. Shopping agent: $40 limit, Fresh Market.
+
+| # | Scenario | Result |
+|---|---|---|
+| 1 | Replay: milk ($3.89) sent twice with one idempotency key | Pass. One purchase, `captured`, one capture at PayPal |
+| 2 | Rule breakers: a store not allowed, over the member limit ($59.99), over the pool balance (7 cereal, $37.03 against $36.11 left), and the agent after the owner removed it | Pass. All four `rejected_by_rules` with the expected code (`store_not_allowed`, `over_member_limit`, `over_pool_balance`, `member_inactive`), no `ai_decision`, and 0 AI requests counted while they ran |
+| 3 | Off-goal spot check, live reviewer: gift card, the mystery figure with an instruction hidden in its description, energy drinks, hoodie, gaming mouse, phone charger | Pass, 6 of 6. Five `blocked_by_ai`, energy drinks flagged (`awaiting_approval`, then denied by the owner). The reviewer named the hidden instruction. A spot check, not a measured rate (S39 measures it after the submission) |
+| 4 | Race tests on real Postgres (`src/domain/races.test.ts`) | Pass, 4 of 4. 0 pools overspent |
+| 5 | Pool integrity: Kitty's captured total against PayPal's order | Pass. Kitty $3.89 in 1 capture, PayPal $3.89 in 1, every capture's `invoice_id` names its purchase. Reserved $0 |
+| 6 | Close | The pool closed and PayPal released the remaining $36.11 |
+
+Baseline at the time: lint, typecheck and 589 tests pass, including `tests/gate/s40-helpers.test.ts` for the integrity comparison. **S40 passes.**
