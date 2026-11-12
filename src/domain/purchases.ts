@@ -27,6 +27,9 @@ export type PurchaseDeps = {
 };
 
 const MAX_QUANTITY = 20;
+/** A purchase waiting for the owner expires after a day (architecture 5.3). */
+export const APPROVAL_TTL_MS = 24 * 60 * 60_000;
+const EXPIRED_MESSAGE = "Nobody decided within a day, so it expired. Nothing was charged.";
 
 export async function submitPurchase(
   deps: PurchaseDeps,
@@ -117,7 +120,7 @@ export async function submitPurchase(
   const purchaseId = started.purchase.id;
 
   if (outcome === "blocked") {
-    return updateReviewed(db, purchaseId, "blocked_by_ai", review, null, "The AI check blocked this purchase.");
+    return updateReviewed(db, purchaseId, "blocked_by_ai", review, null, "The AI check blocked this purchase.", null);
   }
   if (outcome === "needs_approval") {
     const reason =
@@ -126,7 +129,8 @@ export async function submitPurchase(
         : review.decision === "unavailable"
           ? "AI review unavailable"
           : "Over this member's approval amount";
-    return updateReviewed(db, purchaseId, "awaiting_approval", review, reason, null);
+    const expiresAt = new Date(now().getTime() + APPROVAL_TTL_MS);
+    return updateReviewed(db, purchaseId, "awaiting_approval", review, reason, null, expiresAt);
   }
 
   await db.query(
@@ -142,7 +146,32 @@ export async function approvePurchase(deps: PurchaseDeps, input: { purchaseId: s
   if (purchase.status !== "awaiting_approval") {
     throw new DomainError("conflict", "This purchase is no longer waiting for approval.");
   }
+  // A request past its expiry expires now, even if the tick hasn't run yet.
+  const now = (deps.now ?? (() => new Date()))();
+  const [expired] = await deps.db.query<PurchaseRow>(
+    `UPDATE purchases SET status = 'expired', message = $3, updated_at = now()
+     WHERE id = $1 AND status = 'awaiting_approval'
+       AND COALESCE(approval_expires_at, updated_at + interval '24 hours') <= $2
+     RETURNING *`,
+    [purchase.id, now, EXPIRED_MESSAGE],
+  );
+  if (expired) throw new DomainError("conflict", "This request expired before it was approved. Nothing was charged.");
   return reserveAndCapture(deps, purchase.id, "awaiting_approval", input.userId);
+}
+
+/**
+ * Expires every waiting request past its expiry. Requests made before expiries
+ * were recorded expire a day after their last change. Returns how many expired.
+ */
+export async function expireWaitingApprovals(db: Database, now: Date): Promise<number> {
+  const expired = await db.query<{ id: string }>(
+    `UPDATE purchases SET status = 'expired', message = $2, updated_at = now()
+     WHERE status = 'awaiting_approval'
+       AND COALESCE(approval_expires_at, updated_at + interval '24 hours') <= $1
+     RETURNING id`,
+    [now, EXPIRED_MESSAGE],
+  );
+  return expired.length;
 }
 
 export async function denyPurchase(deps: PurchaseDeps, input: { purchaseId: string; userId: string }) {
@@ -165,6 +194,15 @@ export async function recheckCapture(deps: PurchaseDeps, input: { purchaseId: st
   if (purchase.status !== "capture_unknown" && purchase.status !== "capturing") {
     throw new DomainError("conflict", "This purchase has already settled.");
   }
+  return replayCapture(deps, purchase);
+}
+
+/**
+ * Sends the same capture again: same authorization, amount and request ID, so
+ * PayPal returns the original result and never charges twice (architecture
+ * 7.2). The owner's re-check and the tick both use it.
+ */
+export async function replayCapture(deps: PurchaseDeps, purchase: PurchaseRow): Promise<PurchaseRow> {
   if (!purchase.authorization_id) throw new DomainError("conflict", "This purchase has no hold to capture from.");
   const result = await deps.rail.charge({
     purchaseId: purchase.id,
@@ -382,12 +420,13 @@ async function updateReviewed(
   review: { decision: string; reason: string },
   approvalReason: string | null,
   message: string | null,
+  approvalExpiresAt: Date | null,
 ): Promise<PurchaseRow> {
   const [updated] = await db.query<PurchaseRow>(
     `UPDATE purchases SET status = $2, ai_decision = $3, ai_reason = $4, approval_reason = $5, message = $6,
-       updated_at = now()
+       approval_expires_at = $7, updated_at = now()
      WHERE id = $1 AND status = 'reviewing' RETURNING *`,
-    [purchaseId, status, review.decision, review.reason, approvalReason, message],
+    [purchaseId, status, review.decision, review.reason, approvalReason, message, approvalExpiresAt],
   );
   if (updated) return updated;
   const [current] = await db.query<PurchaseRow>("SELECT * FROM purchases WHERE id = $1", [purchaseId]);

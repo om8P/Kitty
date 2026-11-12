@@ -13,7 +13,7 @@ Run on 2026-11-11, at the end of N1, against `main` plus the N1 branch (`session
 | Review uses `json_object` plus Zod, not strict JSON-schema output | Fixed in N2 (S29a). S10 and a live run confirmed strict schema works, so no exception was needed |
 | Tests ran on in-memory PGlite, not real Postgres | Fixed in N1 (M2): every database test runs on the Docker Postgres, also in CI |
 | The app fell back to PGlite with no `DATABASE_URL` | Fixed in N1 (M3): the app refuses to start without it |
-| `schedule.yml` calls `/api/health`, not the tick | Fixed by S41a (N4), as arch 2 already says |
+| `schedule.yml` calls `/api/health`, not the tick | Fixed in N4 (S41a). It calls the tick once the `CRON_SECRET` repo secret is set |
 
 ## Section 3: parts and seams
 
@@ -24,7 +24,7 @@ Run on 2026-11-11, at the end of N1, against `main` plus the N1 branch (`session
 | Rail lacks `verifyWebhookSignature`, `getCapture` and `holdsRealFunds` | Fixed in N4 (S22) |
 | Rail lacks `refreshHold` and `getPoolPaymentState` | Fixed by S44 (I3) and S45 (I2) |
 | No webhook handler | Fixed in N4 (S38): `POST /api/paypal/webhook` and `src/domain/webhooks.ts` |
-| `src/jobs` is empty: no tick jobs | Fixed by S41a (N4), S41b, S42 and S45 (I2), S44 (I3) |
+| `src/jobs` is empty: no tick jobs | Partly fixed in N4 (S41a: `src/jobs/tick.ts`). The rest is S41b, S42 and S45 (I2) and S44 (I3) |
 | Model seam is one `Model` chat interface, not `reviewPurchase` and `agentTurn`, and `AI_PROVIDER` is unused | Arch amended (ADR-0009) |
 | Catalog seam is `search` and `featured`, not `search` and `getProduct` | Arch amended (ADR-0009) |
 | Model seam has only an app-wide daily cap, with no per-household cap or AI-off switch | Fixed by S49 (N6) |
@@ -36,8 +36,8 @@ Run on 2026-11-11, at the end of N1, against `main` plus the N1 branch (`session
 | Agent runs cap turns and purchase requests but have no wall-clock cap (5.7) | Fixed in N2 (S28): 3 minutes |
 | No `honor_ends_at`, so a hold past its honor period gets no warning (5.1, 5.2) | The `authorizations` table with `honor_ends_at` was added in N2 (S19), backfilled for existing pools. New pools write their row since N3 (S24), and the warning comes with S44 (I3) |
 | No hold refresh (5.5) | Fixed by S44 (I3) |
-| Pools the owner never approves are not marked `abandoned` by a timeout (5.1) | Fixed by S41a (N4) |
-| Waiting approvals don't expire after a set time, only when the pool closes (5.3) | Fixed by S41a (N4), with `approval_expires_at` from S19 |
+| Pools the owner never approves are not marked `abandoned` by a timeout (5.1) | Fixed in N4 (S41a): after 3 hours. A late return from PayPal still opens the pool, so a real hold is never orphaned |
+| Waiting approvals don't expire after a set time, only when the pool closes (5.3) | Fixed in N4 (S41a): after 24 hours, through `approval_expires_at` |
 | Unknown refund outcomes are not replayed by the tick (5.4) | Fixed by S43 (I2) |
 | A pool stuck in `closing` is retried only when the owner closes again (5.6) | Fixed by S41b (I2) |
 | Members can't be edited after the pool is created | Fixed in N4 (S25) |
@@ -74,7 +74,7 @@ Run on 2026-11-11, at the end of N1, against `main` plus the N1 branch (`session
 
 | Difference | Resolution |
 |---|---|
-| Stale `reviewing` and `capturing` are not recovered after a restart | Fixed by S41a (N4) |
+| Stale `reviewing` and `capturing` are not recovered after a restart | Fixed in N4 (S41a), with `capture_unknown` replayed for an hour and then flagged |
 | A webhook that contradicts the ledger doesn't pause the pool | Partly fixed in N4 (S38): the purchase is marked `needs_attention` and nothing moves. Pausing the pool is S45 (I2) |
 | Reconciliation with PayPal's totals | Fixed by S45 (I2) |
 | Same-origin check, `SameSite=Lax` cookie, sandbox-only adapter, plain-text rendering | Match |
