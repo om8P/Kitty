@@ -59,3 +59,21 @@ Every capture carries `invoice_id: kitty-{purchase id}`, matching its Kitty purc
 | 6 | Close | The pool closed and PayPal released the remaining $36.11 |
 
 Baseline at the time: lint, typecheck and 589 tests pass, including `tests/gate/s40-helpers.test.ts` for the integrity comparison. **S40 passes.**
+
+## S48: production deploy
+
+**Run on 2026-11-12, session N5.** The S12 Render free web service and Supabase free project, reused. The owner entered every secret in Render and GitHub, added a sandbox webhook for the hosted URL in PayPal, and deployed `main` (N4's code) by hand. No card was asked for or added. The hosted URL is kept out of this public repo.
+
+| Check | Result |
+|---|---|
+| `/api/health` | `status: "ok"`, `db: "ok"`, `dbTls: "verified"`, about 0.5 s warm |
+| Migrations | Applied. The app runs the Drizzle migrations before its first database call (ADR-0010) and logs no line for it, so the evidence is `db: "ok"` and the tick reading the tables that only the migrations create |
+| Tick without a secret, or with a wrong one | 401 both times |
+| Tick from the Schedule workflow with the repo's `CRON_SECRET` | 200 with every job count at 0 (a manual run at 08:27 UTC) |
+| Unsigned event to `/api/paypal/webhook` | 401, "The signature didn't verify." |
+| Sandbox purchase and its webhook | Passed in S47a below |
+| Scheduled runs | Green, but only about every 6 to 7 hours (18:09, 00:37 and 07:41 UTC), not every 5 minutes |
+| Stays awake | **No.** Render sleeps after 15 idle minutes, so between scheduled runs the first visitor waits for a cold start, and the tick's recovery runs only every few hours. See the finding |
+
+**Finding:** GitHub's schedule alone can't keep the free instance awake or run the tick often. A free outside pinger that calls `/api/health` every 10 minutes would keep it awake. That would be a new free service account, so it's the owner's decision (recorded in `plan.md`).
+
