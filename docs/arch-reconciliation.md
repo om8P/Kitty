@@ -40,7 +40,7 @@ Run on 2026-11-11, at the end of N1, against `main` plus the N1 branch (`session
 | Waiting approvals don't expire after a set time, only when the pool closes (5.3) | Fixed by S41a (N4), with `approval_expires_at` from S19 |
 | Unknown refund outcomes are not replayed by the tick (5.4) | Fixed by S43 (I2) |
 | A pool stuck in `closing` is retried only when the owner closes again (5.6) | Fixed by S41b (I2) |
-| Members can't be edited after the pool is created | Fixed by S25 (N4) |
+| Members can't be edited after the pool is created | Fixed in N4 (S25) |
 
 ## Section 6: data model and states
 
@@ -54,7 +54,7 @@ Run on 2026-11-11, at the end of N1, against `main` plus the N1 branch (`session
 | Pool states lack `refreshing` and `paused` | Fixed by S44 (I3) and S45 (I2) |
 | `ledger_entries` also has an `authorize` kind | Arch amended (ADR-0009) |
 | `pools` has extra columns (`rail`, `requested_cents`, `term_days`, `note`) and `agent_runs` keeps turns inside `steps` | No conflict. These add detail the arch doesn't forbid, and S19 kept them in the Drizzle schema |
-| `pool_members` has an `active` flag, where arch 6 lists a member `status` | **Open (found in the N2 re-run):** the owner decides whether `active` is the status, which needs an arch edit, or whether S25 (N4) adds a status column |
+| `pool_members` has an `active` flag, where arch 6 lists a member `status` | Arch amended in N4 (ADR-0009 note): the owner chose `active` as the status |
 
 ## Section 7.4: invariants
 

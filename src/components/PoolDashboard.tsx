@@ -10,7 +10,9 @@ import type { MemberView, PoolStateView, PurchaseView } from "@/lib/views";
 import { AgentPanel } from "./AgentPanel";
 import { BalanceBar } from "./BalanceBar";
 import type { LedgerAction } from "./LedgerGrid";
+import { MemberEditor, type MemberEditTarget } from "./MemberEditor";
 import { PoolStatusBadge } from "./PoolStatusBadge";
+import { ToneBadge } from "./StatusBadge";
 
 // AG Grid measures the DOM, so it loads in the browser only.
 const LedgerGrid = dynamic(() => import("./LedgerGrid").then((module) => module.LedgerGrid), {
@@ -34,6 +36,7 @@ export function PoolDashboard({ initial }: { initial: PoolStateView }) {
   const [message, setMessage] = useState<{ tone: "ok" | "stop"; text: string } | null>(null);
   const [stale, setStale] = useState(false);
   const [closing, setClosing] = useState(false);
+  const [editing, setEditing] = useState<MemberEditTarget | null>(null);
   const closeDialog = useRef<HTMLDialogElement>(null);
   const poolId = initial.pool.id;
 
@@ -115,7 +118,9 @@ export function PoolDashboard({ initial }: { initial: PoolStateView }) {
   }
 
   const waiting = purchases.filter((purchase) => purchase.status === "awaiting_approval");
-  const agent = members.find((member) => member.kind === "agent");
+  const agent = members.find((member) => member.kind === "agent" && member.active);
+  const canEditMembers = pool.status === "active";
+  const missingKinds = (["person", "agent"] as const).filter((kind) => !members.some((member) => member.kind === kind));
   const leftover = pool.authorizedCents - pool.capturedCents;
 
   return (
@@ -252,9 +257,43 @@ export function PoolDashboard({ initial }: { initial: PoolStateView }) {
           </h2>
           <ul className="member-list">
             {members.map((member) => (
-              <MemberRow key={member.id} member={member} />
+              <MemberRow
+                key={member.id}
+                member={member}
+                onEdit={
+                  canEditMembers
+                    ? () =>
+                        setEditing(
+                          member.active
+                            ? { mode: "edit", member }
+                            : { mode: "add", kind: member.kind, label: member.label, member },
+                        )
+                    : undefined
+                }
+              />
             ))}
           </ul>
+          {canEditMembers && missingKinds.length > 0 && (
+            <div className="row" style={{ marginBlockStart: "var(--space-3)" }}>
+              {missingKinds.map((kind) => (
+                <button
+                  key={kind}
+                  type="button"
+                  className="button button--secondary button--small"
+                  onClick={() =>
+                    setEditing({
+                      mode: "add",
+                      kind,
+                      label: kind === "agent" ? "the shopping agent" : "your family member",
+                      member: null,
+                    })
+                  }
+                >
+                  {kind === "agent" ? "Add the shopping agent" : "Add your family member"}
+                </button>
+              ))}
+            </div>
+          )}
         </section>
         <AgentPanel
           agent={agent}
@@ -282,6 +321,18 @@ export function PoolDashboard({ initial }: { initial: PoolStateView }) {
           <LedgerGrid purchases={purchases} busyId={busyId} readOnly={false} onAction={act} />
         )}
       </section>
+
+      {editing && (
+        <MemberEditor
+          poolId={poolId}
+          target={editing}
+          onClose={() => setEditing(null)}
+          onSaved={(text) => {
+            setMessage({ tone: "ok", text });
+            void refresh();
+          }}
+        />
+      )}
 
       <dialog ref={closeDialog} className="dialog" aria-labelledby="close-title">
         <div className="stack">
@@ -312,7 +363,7 @@ export function PoolDashboard({ initial }: { initial: PoolStateView }) {
   );
 }
 
-function MemberRow({ member }: { member: MemberView }) {
+function MemberRow({ member, onEdit }: { member: MemberView; onEdit?: () => void }) {
   const used = member.limitCents > 0 ? Math.min((member.usedCents / member.limitCents) * 100, 100) : 0;
   return (
     <li className="member">
@@ -321,10 +372,17 @@ function MemberRow({ member }: { member: MemberView }) {
       </span>
       <div className="grow">
         <div className="row row--between">
-          <h3>{member.label}</h3>
-          <span className="money small">
-            <strong>{formatUsd(member.remainingCents)}</strong> left of {formatUsd(member.limitCents)}
-          </span>
+          <div className="row">
+            <h3>{member.label}</h3>
+            {!member.active && <ToneBadge tone="neutral">Removed</ToneBadge>}
+          </div>
+          {member.active ? (
+            <span className="money small">
+              <strong>{formatUsd(member.remainingCents)}</strong> left of {formatUsd(member.limitCents)}
+            </span>
+          ) : (
+            <span className="money small muted">{formatUsd(member.usedCents)} spent</span>
+          )}
         </div>
         <div className="meter" aria-hidden="true">
           <span style={{ width: `${used}%` }} />
@@ -335,6 +393,17 @@ function MemberRow({ member }: { member: MemberView }) {
             : `Asks you above ${formatUsd(member.approvalThresholdCents)}`}{" "}
           · {member.allowedStores.join(", ")}
         </p>
+        {onEdit && (
+          <button
+            type="button"
+            className="button button--secondary button--small"
+            style={{ marginBlockStart: "var(--space-2)" }}
+            aria-label={member.active ? `Edit ${member.label}'s rules` : `Add ${member.label} back`}
+            onClick={onEdit}
+          >
+            {member.active ? "Edit rules" : "Add back"}
+          </button>
+        )}
       </div>
     </li>
   );

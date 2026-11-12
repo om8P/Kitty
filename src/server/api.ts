@@ -35,7 +35,7 @@ export async function findMemberPool(
 ): Promise<{ pool: PoolRow; member: MemberRow } | null> {
   const [member] = await db.query<MemberRow>(
     `${SELECT_MEMBERS} JOIN pools p ON p.id = m.pool_id
-     WHERE m.user_id = $1 AND p.household_id = $2 AND p.status = 'active'
+     WHERE m.user_id = $1 AND m.active AND p.household_id = $2 AND p.status = 'active'
      ORDER BY p.created_at DESC LIMIT 1`,
     [session.user.id, session.householdId],
   );

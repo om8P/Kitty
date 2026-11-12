@@ -29,6 +29,8 @@ export type MemberView = {
   kind: "person" | "agent";
   userId: string | null;
   label: string;
+  /** False once the owner removes them. They can't spend, and what they spent stays. */
+  active: boolean;
   limitCents: number;
   usedCents: number;
   remainingCents: number;
@@ -126,6 +128,7 @@ export function toMemberView(member: MemberRow): MemberView {
     kind: member.kind,
     userId: member.user_id,
     label: member.label,
+    active: member.active,
     limitCents: member.limit_cents,
     usedCents: used,
     remainingCents: Math.max(member.limit_cents - used, 0),
