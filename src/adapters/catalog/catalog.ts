@@ -29,7 +29,9 @@ export function createCatalog(
   options: { fetch?: typeof fetch; now?: () => Date } = {},
 ): Catalog & { readonly provider: "channel3" | "seed" } {
   const apiKey = env.CHANNEL3_API_KEY?.trim();
-  const useChannel3 = Boolean(apiKey) && env.CATALOG_PROVIDER?.trim() !== "seed";
+  // `seeded` is the spelling plan.md uses, so both mean the hand-written catalog.
+  const provider = env.CATALOG_PROVIDER?.trim().toLowerCase();
+  const useChannel3 = Boolean(apiKey) && provider !== "seed" && provider !== "seeded";
   const fetchImpl = options.fetch ?? fetch;
   const now = options.now ?? (() => new Date());
   let seeded: Promise<void> | undefined;

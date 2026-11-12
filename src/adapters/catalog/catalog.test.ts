@@ -82,6 +82,18 @@ describe("catalog", () => {
     expect(called).toBe(false);
   });
 
+  it("keeps to the sample catalog when CATALOG_PROVIDER is seed or seeded, even with a Channel3 key", async () => {
+    const db = await openTestDatabase();
+    let called = false;
+    const fakeFetch = async () => ((called = true), new Response("{}"));
+    for (const value of ["seed", "seeded", " Seeded "]) {
+      const catalog = createCatalog(db, { CHANNEL3_API_KEY: "test-key", CATALOG_PROVIDER: value }, { fetch: fakeFetch });
+      expect(catalog.provider).toBe("seed");
+      await catalog.search("milk");
+    }
+    expect(called).toBe(false);
+  });
+
   it("stores Channel3 results under local IDs and counts the search", async () => {
     const db = await openTestDatabase();
     const sent: { headers: Headers; body: unknown }[] = [];
