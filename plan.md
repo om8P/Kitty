@@ -126,7 +126,7 @@ Database tests need `docker compose up -d db` first. From step M2 on, the race t
 | S37 | Close and release | Agent + You | S24, S31 | done | D | N3 |
 | S38 | Webhook intake | Agent | S07, S19, S24, S31, S37 | done | D | N4 |
 | S39 | Labeled AI test set | Agent + You | S29, S35 | pending | P | I1 |
-| S40 | **Gate:** milestone 3 scenarios | Agent + You | M2, M4, S27, S32, S34, S36, S37, S38, S41a | pending | D | N5 |
+| S40 | **Gate:** milestone 3 scenarios | Agent + You | M2, M4, S27, S32, S34, S36, S37, S38, S41a | done | D | N5 |
 | **Phase D: Full-term pools (PRD milestone 4)** | | | | | | |
 | S41a | Tick endpoint and purchase recovery | Agent | M2, S38 | done | D | N4 |
 | S41b | Remaining tick jobs | Agent | S41a | pending | P | I2 |
@@ -137,8 +137,8 @@ Database tests need `docker compose up -d db` first. From step M2 on, the race t
 | S46a | Fault tests: AI, catalog, agent | Agent | S42, S43, S44, S45 | pending | P | I4 |
 | S46b | Fault tests: payments and webhooks | Agent | S42, S43, S44, S45 | pending | P | I4 |
 | S46c | Failure screens | Agent | S46a, S46b | pending | P | I4 |
-| S48 | Production deploy | Agent + You | S12, S41a | pending | D | N5 |
-| S47a | **Gate, part 1:** start a full-term pool | Agent + You | S48 | pending | D | N5 |
+| S48 | Production deploy | Agent + You | S12, S41a | done | D | N5 |
+| S47a | **Gate, part 1:** start a full-term pool | Agent + You | S48 | done | D | N5 |
 | S47b | **Gate, part 2:** finish the full-term pool | Agent + You | S47a, S44 | pending | P | I3 |
 | **Phase E: Public demo (PRD milestone 5)** | | | | | | |
 | S49 | Judge access | Agent + You | S48 | pending | D | N6 |
@@ -913,3 +913,6 @@ Every change gets one line in the Change log.
 | 2026-11-12 | S24's last item is done in S41a: the tick marks pools never approved within 3 hours `abandoned`, and a late return from PayPal still opens the pool | A real hold must never be left with no pool behind it |
 | 2026-11-12 | The tick's `capture_unknown` replay stops after the 1-hour window S05 proved and flags the purchase `needs_attention`, with the money still reserved. A webhook that contradicts the ledger also sets `needs_attention`. Pausing the pool waits for S45 (I2) | Arch 7.2: after the window, stop sending and read PayPal's record. Reconciliation is S45's |
 | 2026-11-12 | `webhook_events` stores Kitty's own event shape, not PayPal's raw body, and events Kitty doesn't use aren't stored | Keeps PayPal field names inside the adapter. Unused events have nothing to apply |
+| 2026-11-12 | S40, S48 and S47a `done` (session N5). S40's scenarios are scripted in `scripts/gate/s40-scenarios.ts`, and every result is in `docs/test-results.md` | The gate passed on the real sandbox and live Groq, the app runs on Render and Supabase with no card, and the full-term pool started on 2026-11-12 at 08:34 UTC |
+| 2026-11-12 | S48 found that GitHub runs the 5-minute schedule only every 6 to 7 hours, so the free Render instance sleeps between runs and the tick runs rarely. Keeping it awake (for example a free outside pinger on `/api/health`) is for the owner to decide before N6's judge access | The S12 sleep check, now measured. A new free service account needs the owner's approval |
+| 2026-11-12 | S47b (I3) can start after 2026-11-15 08:34 UTC, when the S47a pool is 3 days old, as well as after 2026-11-13T07:46Z for S06b | Its honor period starts at the hosted approval |
