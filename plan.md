@@ -83,15 +83,15 @@ Database tests need `docker compose up -d db` first. From step M2 on, the race t
 | S03 | Scaffold the app | Agent | S01 | done | |  |
 | S04 | PayPal sandbox client | Agent | S03 | done | |  |
 | S05 | Spike: authorize and partial captures | Agent + You | S02, S04 | done | |  |
-| S06a | Spike: refund and void | Agent + You | S05 | pending | D | N3 |
+| S06a | Spike: refund and void | Agent + You | S05 | done | D | N3 |
 | S06b | Spike: reauthorize | Agent + You | S05 | blocked | P | I3 |
-| S07 | Spike: webhooks and read calls | Agent + You | S06a | pending | D | N3 |
+| S07 | Spike: webhooks and read calls | Agent + You | S06a | done | D | N3 |
 | S08 | **Gate:** record the feasibility decision | Agent + You | S05 | done | D | N1 |
 | S08a | Spike the token fallback (only if S08 chose it) | Agent + You | S08 | skipped | D | N1 |
 | S09 | Check AG Grid and Drizzle row locks | Agent | S03 | done | |  |
 | S10 | Trial Groq tool calls and strict output | Agent + You | S02, S03 | done | D | N2 |
 | S11 | Sample Channel3 and ask about its terms | Agent + You | S02, S03 | done | |  |
-| S11a | Record Channel3's answer | You | S11 | pending | D | N3 |
+| S11a | Record Channel3's answer | You | S11 | done | D | N3 |
 | S12 | Test deploy on Render and Supabase | Agent + You | S02, S03 | done | |  |
 | **Phase B: Product direction (PRD milestone 2)** | | | | | | |
 | S15 | Finish competitor and PayPal research | Agent | S01 | done | |  |
@@ -101,7 +101,7 @@ Database tests need `docker compose up -d db` first. From step M2 on, the race t
 | M1 | Land the MVP and sync this plan | Agent + You | S08 | done | D | N1 |
 | M2 | Move tests to real Postgres and add race tests | Agent | M1 | done | D | N1 |
 | M3 | Remove simulated payments and PGlite from the app | Agent | M1 | done | D | N1 |
-| M4 | Walk the built flows against the PayPal sandbox | Agent + You | M1, M3, S06a | pending | D | N3 |
+| M4 | Walk the built flows against the PayPal sandbox | Agent + You | M1, M3, S06a | done | D | N3 |
 | M5 | Reconcile the code and the architecture | Agent | M1 | done | D | N1 |
 | **Phase C: Shared pools (PRD milestone 3), MVP built** | | | | | | |
 | S19 | Drizzle schema, migrations and the missing tables | Agent | M1, M2 | done | D | N2 |
@@ -109,7 +109,7 @@ Database tests need `docker compose up -d db` first. From step M2 on, the race t
 | S21 | Hard rules | Agent | S19 | done | |  |
 | S22 | Payment rail seam | Agent | S08 | in-progress | D | N4 |
 | S23 | Demo access and owner guard | Agent | S19 | done | |  |
-| S24 | Create and approve pools | Agent + You | S23 | in-progress | D | N3 |
+| S24 | Create and approve pools | Agent + You | S23 | done | D | N3 |
 | S25 | Members and rules | Agent | S19, S23, S24 | in-progress | D | N4 |
 | S26 | Catalog seam and marketplace | Agent | S19, S23 | done | |  |
 | S27 | Channel3 adapter | Agent | S11a, S26 | in-progress | D | N4 |
@@ -118,12 +118,12 @@ Database tests need `docker compose up -d db` first. From step M2 on, the race t
 | S29a | Strict review schema | Agent | S10, S29 | done | D | N2 |
 | S30 | Purchase service: checks and review | Agent | S20, S21, S26, S29 | done | |  |
 | S31 | Purchase service: reserve and capture | Agent | S22, S30 | done | |  |
-| S32 | Member buying screens | Agent + You | S31 | in-progress | D | N3 |
+| S32 | Member buying screens | Agent + You | S31 | done | D | N3 |
 | S33 | Owner approval | Agent | S31 | done | |  |
-| S34 | AG Grid owner ledger | Agent | S09, S33 | in-progress | D | N3 |
+| S34 | AG Grid owner ledger | Agent | S09, S33 | done | D | N3 |
 | S35 | Agent runner | Agent | S28, S31 | done | |  |
-| S36 | Agent run screens | Agent + You | S24, S34, S35 | in-progress | D | N3 |
-| S37 | Close and release | Agent + You | S24, S31 | in-progress | D | N3 |
+| S36 | Agent run screens | Agent + You | S24, S34, S35 | done | D | N3 |
+| S37 | Close and release | Agent + You | S24, S31 | done | D | N3 |
 | S38 | Webhook intake | Agent | S07, S19, S24, S31, S37 | pending | D | N4 |
 | S39 | Labeled AI test set | Agent + You | S29, S35 | pending | P | I1 |
 | S40 | **Gate:** milestone 3 scenarios | Agent + You | M2, M4, S27, S32, S34, S36, S37, S38, S41a | pending | D | N5 |
@@ -903,3 +903,8 @@ Every change gets one line in the Change log.
 | 2026-11-11 | S19, S10, S28 and S29a `done` (session N2). Drizzle owns the schema and migrations, and the domain keeps parameterized SQL behind the transaction port (ADR-0010, owner's choice). The `stores`, `member_stores` and `authorizations` tables and the new columns exist. The model seam uses `groq-sdk`, and the reviewer uses strict schema. S48's migration note is updated | The owner kept the arch's choices, and Drizzle's driver returns dates as strings for raw SQL, so the port stays on `pg` |
 | 2026-11-11 | S10's results, run on 2026-11-10 but never committed, were brought over from the old `step/S10-groq-trial` worktree with the owner's console limits. No new trial ran | Saves Groq quota. The trial's findings still hold |
 | 2026-11-11 | The N2 re-run of M5 found one open difference: `pool_members` has an `active` flag where arch 6 lists a status | For the owner to decide before S25 |
+| 2026-11-12 | S06a, S07, S11a, M4, S24, S32, S34, S36 and S37 `done` (session N3). Results in `docs/spike/S06a.md`, `docs/spike/S07.md` and `docs/test-results.md`. Arch Q4 (void part), Q6 and Q7 are answered | Every built money flow ran against the real sandbox and matched PayPal |
+| 2026-11-12 | N3 set up the webhook tunnel before S06a, so S06a's run also produced S07's events. Free Cloudflare quick tunnels kept dropping, so the owner used a free ngrok domain, and PayPal's resend call recovered the lost deliveries | Saved a sandbox approval. The step order and commits are unchanged |
+| 2026-11-12 | S24's last item (the tick marks never-approved pools `abandoned`) stays with S41a (N4), and S37's scheduled retries of a stuck `closing` pool stay with S41b (I2). S24 now writes the pool's `authorizations` row on approval, and a confirmed void marks it `voided` | Those items were already owned by the tick steps, and the rest of each step passed in M4 |
+| 2026-11-12 | N3 fixed two defects with tests: PayPal's `MAX_CAPTURE_AMOUNT_EXCEEDED` refusal now counts as a definite failure, and `CATALOG_PROVIDER=seeded` now selects the seeded catalog | Found in S06a and before M4. Without the second fix the app would have spent Channel3 credits |
+| 2026-11-12 | M4 found that a four-item agent run reaches Groq's free per-minute token limit and stops safely after three purchases. Pacing between agent turns is a candidate for S49 (N6) | Free-limit behavior, not a defect. Recorded in `docs/test-results.md` |

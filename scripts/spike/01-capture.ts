@@ -11,9 +11,9 @@
  * Reads credentials from .env itself and never prints them. Raw, redacted
  * exchanges and saved IDs go to the gitignored .spike-logs/S05/ folder.
  */
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { createPayPalClient, type PayPalClient } from "../../src/adapters/payments/paypal-client";
+import type { PayPalClient } from "../../src/adapters/payments/paypal-client";
 import {
   MAX_CAPTURES,
   ORDER_AMOUNT,
@@ -21,17 +21,15 @@ import {
   captureInvoiceId,
   captureRequestId,
   compareReplay,
-  createLoggingFetch,
   plannedTotalCents,
   summarizeCapture,
   type CallSummary,
   type ReplayVerdict,
 } from "./s05-helpers";
+import { dollars, makeClient as makeSpikeClient, toCents, waitForApproval } from "./spike-env";
 
 const LOG_DIR = join(".spike-logs", "S05");
 const STATE_FILE = join(LOG_DIR, "state.json");
-const APPROVAL_POLL_MS = 5_000;
-const APPROVAL_WAIT_MS = 15 * 60_000;
 const DIFFERENT_BODY_AMOUNT = "1.00";
 
 type CaptureRecord = CallSummary & {
@@ -104,35 +102,7 @@ function requireAuthorization(state: State): string {
 }
 
 function makeClient(): PayPalClient {
-  try {
-    process.loadEnvFile(".env");
-  } catch {
-    throw new Error("Could not load .env. Create it from .env.example (plan step S02).");
-  }
-  const clientId = process.env.PAYPAL_CLIENT_ID;
-  const clientSecret = process.env.PAYPAL_CLIENT_SECRET;
-  if (!clientId || !clientSecret) throw new Error("PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET must be set in .env.");
-
-  const logFile = join(LOG_DIR, `${new Date().toISOString().replace(/[:.]/g, "-")}.jsonl`);
-  const loggingFetch = createLoggingFetch(fetch, (entry) => appendFileSync(logFile, `${JSON.stringify(entry)}\n`));
-  return createPayPalClient({
-    clientId,
-    clientSecret,
-    webhookId: process.env.PAYPAL_WEBHOOK_ID ?? "",
-    fetch: loggingFetch,
-  });
-}
-
-function toCents(value: string | undefined): number {
-  return value === undefined ? 0 : Math.round(Number(value) * 100);
-}
-
-function dollars(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
-}
-
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  return makeSpikeClient(LOG_DIR).client;
 }
 
 /** Reads the authorization and the order's capture list. Prints only IDs, statuses and amounts. */
@@ -211,21 +181,7 @@ async function waitAndAuthorize(client: PayPalClient, state: State) {
     console.log(`Already authorized: ${state.authorizationId}`);
     return;
   }
-  const deadline = Date.now() + APPROVAL_WAIT_MS;
-  let lastStatus = "";
-  console.log(`Waiting up to ${APPROVAL_WAIT_MS / 60_000} minutes for approval...`);
-  while (true) {
-    const order = await client.getOrder(state.orderId);
-    const status = order.outcome === "succeeded" ? order.data.status : `(${order.outcome})`;
-    if (status !== lastStatus) {
-      console.log(`  ${new Date().toISOString()} order status: ${status}`);
-      lastStatus = status;
-    }
-    if (status === "APPROVED") break;
-    if (status === "VOIDED" || status === "COMPLETED") throw new Error(`Order ended as ${status} before authorization.`);
-    if (Date.now() > deadline) throw new Error('Timed out waiting for approval. Approve, then run "authorize".');
-    await sleep(APPROVAL_POLL_MS);
-  }
+  await waitForApproval(client, state.orderId);
 
   state.authorizeRequestId = `s05-authorize-${state.runId}`;
   const authorized = await client.authorizeOrder({ orderId: state.orderId, requestId: state.authorizeRequestId });
